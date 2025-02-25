@@ -11,6 +11,7 @@ import {
 } from '@/types/room'
 import VotingControls from './components/VotingControls'
 import PlayerCard from './components/PlayerCard'
+import VotingResults from './components/VotingResults'
 import Image from 'next/image'
 import meniconLogo from '../../../public/menicon-logo.png'
 import vercelLogo from '../../../public/vercel.svg'
@@ -21,10 +22,12 @@ export default function RoomPage() {
 	const [room, setRoom] = useState<Room | null>(null)
 	const [error, setError] = useState<string | null>(null)
 	const [inviteUrl, setInviteUrl] = useState('')
+	const [inviteToast, setInviteToast] = useState('')
 	const [currentUser, setCurrentUser] = useState<User | null>(null)
 	const [timeLeft, setTimeLeft] = useState<number | null>(null)
 	const [voteStats, setVoteStats] = useState<{ [key: number]: number }>({})
 	const [countdown, setCountdown] = useState<number | null>(null)
+	const [showResults, setShowResults] = useState(false)
 
 	useEffect(() => {
 		const name = searchParams.get('name')
@@ -201,8 +204,10 @@ export default function RoomPage() {
 			currentUser?.roomName ? encodeURIComponent(currentUser?.roomName) : 'room'
 		}`
 		navigator.clipboard.writeText(url)
-		setInviteUrl('Link copied!')
-		setTimeout(() => setInviteUrl(''), 2000)
+		setInviteToast(
+			'Invite URL copied! Share with your team members to join the planning session.'
+		)
+		setTimeout(() => setInviteToast(''), 3000)
 	}
 
 	// Calculate progress percentage for the timer
@@ -224,15 +229,20 @@ export default function RoomPage() {
 					</div>
 				</div>
 			)}
-			<div className='h-dvh bg-gradient-to-b from-white to-gray-100 dark:from-black dark:to-gray-800 p-4 md:p-8 overflow-x-hidden overflow-y-hidden'>
-				<div className='max-w-6xl mx-auto w-full h-full flex flex-col'>
+			<div className='h-dvh bg-gradient-to-b from-white to-gray-100 dark:from-black dark:to-gray-800 p-4 md:p-8 overflow-x-hidden overflow-y-auto'>
+				<div className='max-w-6xl mx-auto w-full h-full flex flex-col justify-between'>
 					<div className='flex flex-2 flex-col md:flex-row justify-between items-center mb-8 gap-4'>
 						<div className='flex flex-col items-start w-auto'>
 							<h1 className='text-3xl flex font-bold text-gray-900 dark:text-white mb-4'>
 								{currentUser?.roomName || 'Planning Poker Room'}
 							</h1>
 						</div>
-						<div className='flex items-center gap-4 flex-wrap justify-center'>
+						<div className='flex items-center gap-4 flex-wrap justify-center relative'>
+							{inviteToast && (
+								<div className='fixed top-28 w-1/8 left-4/5 transform bg-[#ffffff] z-10 text-black border border-l-[4px] border-l-teal-500 px-6 py-3 duration-500'>
+									{inviteToast}
+								</div>
+							)}
 							{currentUser?.role === 'admin' && (
 								<div className='flex gap-2 flex-wrap justify-center'>
 									{!room.isVoting && (
@@ -257,26 +267,34 @@ export default function RoomPage() {
 										</button>
 									)}
 									{room.revealed && (
-										<button
-											onClick={handleResetVotes}
-											className='px-4 py-2 bg-[#EC1C24] hover:bg-[#D01017] text-white rounded-md shadow-sm transition-colors duration-200'
-										>
-											Reset
-										</button>
+										<div className='flex gap-2 flex-wrap justify-center'>
+											<button
+												onClick={handleResetVotes}
+												className='px-4 py-2 bg-[#EC1C24] hover:bg-[#D01017] text-white rounded-md shadow-sm transition-colors duration-200'
+											>
+												Reset
+											</button>
+											<button
+												onClick={() => setShowResults(true)}
+												className='px-4 py-2 bg-[#00A550] hover:bg-[#008040] text-white rounded-md shadow-sm transition-colors duration-200'
+											>
+												View Results
+											</button>
+										</div>
 									)}
 									<button
 										onClick={handleCopyInviteLink}
 										className='px-4 py-2 bg-[#00A550] hover:bg-[#008040] text-white rounded-md shadow-sm transition-colors duration-200'
 									>
-										{'Invite to Room'}
+										{inviteToast ? 'Copied!' : 'Invite Team'}
 									</button>
 								</div>
 							)}
 						</div>
 					</div>
 
-					<div className='flex-1 rounded-lg p-4 md:p-4'>
-						<div className='h-full w-full flex items-center justify-center'>
+					<div className='flex-2 flex flex-col gap-8'>
+						<div className='w-full flex items-center justify-center mb-8'>
 							<div className='relative h-[200px] w-[400px]'>
 								<div className='w-full h-full bg-[#2A2A2A] rounded-lg flex flex-col items-center justify-center shadow-2xl'>
 									<div className='w-[95%] h-[85%] bg-[#333333] rounded-lg flex flex-col items-center justify-center shadow-inner relative'>
@@ -366,10 +384,13 @@ export default function RoomPage() {
 											// For 5+ players, distribute evenly around the table
 											const angle =
 												index * ((2 * Math.PI) / totalPlayers) - Math.PI / 2
-											const radius = 125 // Reduced radius for closer positioning
+											const radius = 200 // Increased radius for better spacing
+											const leftDivider = 2.5
+											const topDivider = 2
 
-											left = 50 + (radius * Math.cos(angle)) / 2
-											top = 50 + radius * Math.sin(angle)
+											// Adjust the position calculations for better distribution
+											left = 50 + (radius * Math.cos(angle)) / leftDivider // Adjusted divisor for X-axis
+											top = 60 + (radius * Math.sin(angle)) / topDivider // Adjusted divisor for Y-axis
 
 											// Determine position based on angle
 											if (angle >= -Math.PI / 4 && angle < Math.PI / 4)
@@ -415,13 +436,24 @@ export default function RoomPage() {
 								</div>
 							</div>
 						</div>
+						<div className='w-full'>
+							<VotingResults
+								voteStats={voteStats}
+								revealed={room.revealed}
+								showResults={showResults}
+								onClose={() => setShowResults(false)}
+							/>
+						</div>
 					</div>
-
-					{currentUser?.role === 'estimator' && (
+					{currentUser && (
 						<VotingControls
 							onVote={handleVote}
 							votingOptions={room.votingOptions}
-							disabled={!room.isVoting || room.revealed}
+							disabled={
+								!room.isVoting ||
+								room.revealed ||
+								currentUser?.role !== 'estimator'
+							}
 							currentVote={currentUser.vote}
 						/>
 					)}

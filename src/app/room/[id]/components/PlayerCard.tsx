@@ -23,14 +23,22 @@ export default function PlayerCard({
 	position = 'top',
 }: PlayerCardProps) {
 	return (
-		<div className={`flex ${position === 'bottom' ? 'flex-col-reverse' : 'flex-col'} items-center gap-2 w-[100px]`}>
+		<div
+			className={`flex ${
+				position === 'bottom' ? 'flex-col-reverse' : 'flex-col'
+			} items-center gap-2 w-[100px]`}
+		>
 			<div
-				className={`text-sm font-medium ${isCurrentUser ? 'text-[#00A550] font-bold' : 'text-black dark:text-white'} text-center truncate max-w-[100px] overflow-hidden`}
+				className={`text-sm font-medium ${
+					isCurrentUser
+						? 'text-[#00A550] font-bold'
+						: 'text-black dark:text-white'
+				} text-center truncate max-w-[100px] overflow-hidden`}
 			>
-				{player.name}
 				{player.role === 'admin' && (
-					<span className='ml-1 text-[#EC1C24]'>👑</span>
+					<span className='ml-1 text-[#EC1C24]'>👑 </span>
 				)}
+				{player.name}
 			</div>
 
 			<motion.div
