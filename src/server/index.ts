@@ -8,7 +8,7 @@ const app = next({ dev });
 const handle = app.getRequestHandler();
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
-const HOST = process.env.RENDER_EXTERNAL_HOSTNAME || '0.0.0.0';
+const HOST = '0.0.0.0';
 
 app.prepare().then(() => {
     const server = createServer((req, res) => {
@@ -33,9 +33,9 @@ app.prepare().then(() => {
 
     const io = initSocketServer(server);
 
-    server.listen(PORT, HOST, () => {
+    server.listen(PORT, () => {
         console.log(`> Server running in ${dev ? 'development' : 'production'} mode`);
-        console.log(`> Ready on http://${HOST}:${PORT}`);
+        console.log(`> Ready on http://${process.env.RENDER_EXTERNAL_URL}:${PORT}`);
     }).on('error', (err) => {
         console.error('Failed to start server:', err);
         process.exit(1);
