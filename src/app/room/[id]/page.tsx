@@ -41,8 +41,7 @@ export default function RoomPage() {
 				? 'http://localhost:3000'
 				: `https://${
 						process.env.VERCEL_BRANCH_URL ||
-						process.env.VERCEL_URL ||
-						'cloud-deck.vercel.app'
+						process.env.VERCEL_URL
 				  }`
 		)
 		setSocket(newSocket)

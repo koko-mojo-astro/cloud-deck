@@ -43,7 +43,6 @@ export const initSocketServer = (httpServer: HttpServer) => {
   >(httpServer, {
     cors: {
       origin: process.env.NODE_ENV === 'development' ? true : [
-        'https://cloud-deck.vercel.app',
         ...(process.env.VERCEL_URL ? [`https://${process.env.VERCEL_URL}`] : []),
         ...(process.env.VERCEL_BRANCH_URL ? [`https://${process.env.VERCEL_BRANCH_URL}`] : []),
         // Allow all Vercel preview deployments
