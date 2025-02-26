@@ -44,6 +44,49 @@ npm run build
 npm run start
 ```
 
+## Contributing
+
+We welcome contributions to Cloud Deck! Here's how you can help:
+
+### Development Environment Setup
+
+1. Fork the repository
+2. Clone your fork: `git clone https://github.com/YOUR_USERNAME/cloud-deck.git`
+3. Create a new branch for your feature/fix: `git checkout -b feature/your-feature-name`
+4. Install dependencies: `npm install`
+5. Start the development server: `npm run dev:server`
+
+### Coding Standards
+
+- Use TypeScript for all new code
+- Follow the existing code style and formatting
+- Write meaningful commit messages following conventional commits format
+- Add appropriate comments and documentation
+- Ensure all tests pass before submitting
+
+### Pull Request Process
+
+1. Update the README.md with details of changes if needed
+2. Ensure your code follows our coding standards
+3. Create a Pull Request with a clear title and description
+4. Link any related issues in your PR description
+5. Wait for review and address any feedback
+
+### Branch Protection Rules and Naming Convention
+
+We follow a structured branching strategy to maintain code quality and streamline the development process:
+
+- `main` - Production-ready code, protected branch
+- Feature branches: `feature/your-feature-name`
+- Bug fixes: `fix/bug-description`
+- Hotfixes: `hotfix/issue-description`
+
+Branch protection rules:
+- Direct pushes to `main` branch are not allowed
+- All changes must go through pull requests
+- Pull requests require at least one review approval
+- Status checks must pass before merging
+
 ## Tech Stack
 
 - Next.js 15.1.7
