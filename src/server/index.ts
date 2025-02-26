@@ -7,9 +7,6 @@ const dev = process.env.NODE_ENV !== 'production';
 const app = next({ dev });
 const handle = app.getRequestHandler();
 
-const PORT = parseInt(process.env.PORT || '3000', 10);
-const HOST = '0.0.0.0';
-
 app.prepare().then(() => {
     const server = createServer((req, res) => {
         if (!req.url) {
@@ -33,7 +30,7 @@ app.prepare().then(() => {
 
     const io = initSocketServer(server);
 
-    server.listen(10000, () => {
-        console.log('> Ready on port 10000');
+    server.listen(3000, () => {
+        console.log('> Ready on port 3000');
     });
 });
