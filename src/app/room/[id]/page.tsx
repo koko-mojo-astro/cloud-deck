@@ -36,7 +36,10 @@ export default function RoomPage() {
 			return
 		}
 
-		const newSocket = io('http://localhost:3000')
+		const newSocket = io(window.location.origin, {
+			path: '/socket.io',
+			transports: ['websocket', 'polling']
+		})
 		setSocket(newSocket)
 
 		const role = searchParams.get('role') || 'estimator'

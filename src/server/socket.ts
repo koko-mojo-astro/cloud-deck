@@ -42,9 +42,20 @@ export const initSocketServer = (httpServer: HttpServer) => {
     SocketData
   >(httpServer, {
     cors: {
-      origin: '*',
-      methods: ['GET', 'POST']
-    }
+      origin: process.env.NODE_ENV === 'development'
+        ? true
+        : [
+            process.env.RENDER_EXTERNAL_URL || 'http://localhost:3000',
+            // Allow all subdomains on render.com
+            /https?:\/\/.*\.onrender\.com$/
+          ],
+      methods: ['GET', 'POST'],
+      credentials: true,
+      allowedHeaders: ['Content-Type']
+    },
+    transports: ['websocket', 'polling'],
+    pingTimeout: 60000,
+    pingInterval: 25000
   });
 
   io.on('connection', (socket) => {
