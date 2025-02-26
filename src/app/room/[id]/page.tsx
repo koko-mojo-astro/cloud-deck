@@ -35,8 +35,11 @@ export default function RoomPage() {
 			setError('Name is required')
 			return
 		}
-
-		const newSocket = io(window.location.origin, {
+		const socket_url =
+			process.env.NODE_ENV === 'development'
+				? 'http://localhost:3000'
+				: process.env.RENDER_EXTERNAL_URL
+		const newSocket = io(socket_url, {
 			path: '/socket.io',
 			transports: ['websocket', 'polling'],
 			reconnectionAttempts: 5,
