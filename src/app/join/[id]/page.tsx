@@ -35,7 +35,11 @@ export default function JoinRoom() {
 					<p className='mt-6 text-lg leading-8 text-gray-600 dark:text-gray-300'>
 						{roomName ? (
 							<>
-								Enter your details to join <span className='text-[#00A550] dark:text-[#00A550] font-medium'>{roomName}</span> on the Cloud.
+								Enter your details to join{' '}
+								<span className='text-[#00A550] dark:text-[#00A550] font-medium'>
+									{roomName}
+								</span>{' '}
+								on the Cloud.
 							</>
 						) : (
 							'Enter your details to join the room on the Cloud.'
@@ -44,7 +48,7 @@ export default function JoinRoom() {
 				</div>
 
 				<div className='mt-16 flow-root sm:mt-24'>
-					<div className='rounded-lg bg-white dark:bg-black shadow-lg p-8'>
+					<div className='max-w-md mx-auto rounded-lg bg-white dark:bg-black shadow-lg p-8'>
 						<div className='flex flex-col items-center space-y-6'>
 							<div className='space-y-4 w-full max-w-md'>
 								<input
