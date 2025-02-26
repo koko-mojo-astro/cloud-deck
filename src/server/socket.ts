@@ -42,9 +42,15 @@ export const initSocketServer = (httpServer: HttpServer) => {
     SocketData
   >(httpServer, {
     cors: {
-      origin: '*',
-      methods: ['GET', 'POST']
-    }
+      origin: process.env.NODE_ENV === 'production' 
+        ? process.env.NEXT_PUBLIC_APP_URL || 'https://cloud-deck.vercel.app'
+        : 'http://localhost:3000',
+      methods: ['GET', 'POST'],
+      credentials: true
+    },
+    transports: ['websocket', 'polling'],
+    pingTimeout: 60000,
+    pingInterval: 25000
   });
 
   io.on('connection', (socket) => {
