@@ -36,14 +36,10 @@ export default function RoomPage() {
 			return
 		}
 
-		const newSocket = io(
-			process.env.NODE_ENV === 'development'
-				? 'http://localhost:3000'
-				: `https://${
-						process.env.VERCEL_BRANCH_URL ||
-						process.env.VERCEL_URL
-				  }`
-		)
+		const newSocket = io(window.location.origin, {
+			path: '/socket.io',
+			transports: ['websocket', 'polling']
+		})
 		setSocket(newSocket)
 
 		const role = searchParams.get('role') || 'estimator'
