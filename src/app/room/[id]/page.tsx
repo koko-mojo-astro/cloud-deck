@@ -35,8 +35,11 @@ export default function RoomPage() {
 			setError('Name is required')
 			return
 		}
-
-		const newSocket = io('http://localhost:3000')
+		const socket_url =
+			process.env.NODE_ENV === 'development'
+				? 'http://localhost:3000'
+				: process.env.RENDER_EXTERNAL_URL + ':10000'
+		const newSocket = io(socket_url)
 		setSocket(newSocket)
 
 		const role = searchParams.get('role') || 'estimator'

@@ -22,7 +22,7 @@ app.prepare().then(() => {
 
     const io = initSocketServer(server);
 
-    server.listen(3000, () => {
-        console.log('> Ready on http://localhost:3000');
+    server.listen(10000, () => {
+        console.log('> Ready on port 10000');
     });
 });
