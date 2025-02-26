@@ -42,12 +42,13 @@ export const initSocketServer = (httpServer: HttpServer) => {
     SocketData
   >(httpServer, {
     cors: {
-      origin: process.env.NODE_ENV === 'development' ? true : [
-        ...(process.env.VERCEL_URL ? [`https://${process.env.VERCEL_URL}`] : []),
-        ...(process.env.VERCEL_BRANCH_URL ? [`https://${process.env.VERCEL_BRANCH_URL}`] : []),
-        // Allow all Vercel preview deployments
-        /https:\/\/cloud-deck[\w-]*\.vercel\.app$/
-      ].filter(Boolean),
+      origin: process.env.NODE_ENV === 'development'
+        ? true
+        : [
+            process.env.RENDER_EXTERNAL_URL || 'http://localhost:3000',
+            // Allow all subdomains on render.com
+            /https?:\/\/.*\.onrender\.com$/
+          ],
       methods: ['GET', 'POST'],
       credentials: true,
       allowedHeaders: ['Content-Type']
