@@ -44,11 +44,15 @@ export const initSocketServer = (httpServer: HttpServer) => {
     cors: {
       origin: [
         'http://localhost:3000',
+        'https://cloud-deck.vercel.app',
         ...(process.env.VERCEL_URL ? [`https://${process.env.VERCEL_URL}`] : []),
         ...(process.env.VERCEL_BRANCH_URL ? [`https://${process.env.VERCEL_BRANCH_URL}`] : []),
+        // Allow all Vercel preview deployments
+        /^https:\/\/cloud-deck-git-.*-.*\.vercel\.app$/
       ].filter(Boolean),
       methods: ['GET', 'POST'],
-      credentials: true
+      credentials: true,
+      allowedHeaders: ['Content-Type']
     },
     transports: ['websocket', 'polling'],
     pingTimeout: 60000,
