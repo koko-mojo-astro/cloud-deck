@@ -33,26 +33,7 @@ app.prepare().then(() => {
 
     const io = initSocketServer(server);
 
-    server.listen(PORT, () => {
-        console.log(`> Server running in ${dev ? 'development' : 'production'} mode`);
-        console.log(`> Ready on http://${process.env.RENDER_EXTERNAL_URL}:${PORT}`);
-    }).on('error', (err) => {
-        console.error('Failed to start server:', err);
-        process.exit(1);
+    server.listen(10000, () => {
+        console.log('> Ready on port 10000');
     });
-
-    // Graceful shutdown
-    const shutdown = () => {
-        console.log('Received termination signal. Closing server...');
-        server.close(() => {
-            console.log('Server closed');
-            process.exit(0);
-        });
-    };
-
-    process.on('SIGTERM', shutdown);
-    process.on('SIGINT', shutdown);
-}).catch(err => {
-    console.error('Error during Next.js initialization:', err);
-    process.exit(1);
 });
