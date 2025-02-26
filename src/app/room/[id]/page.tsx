@@ -36,7 +36,15 @@ export default function RoomPage() {
 			return
 		}
 
-		const newSocket = io(process.env.NEXT_PUBLIC_SOCKET_URL || (process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : 'https://cloud-deck.vercel.app'))
+		const newSocket = io(
+			process.env.NODE_ENV === 'development'
+				? 'http://localhost:3000'
+				: `https://${
+						process.env.VERCEL_BRANCH_URL ||
+						process.env.VERCEL_URL ||
+						'cloud-deck.vercel.app'
+				  }`
+		)
 		setSocket(newSocket)
 
 		const role = searchParams.get('role') || 'estimator'
