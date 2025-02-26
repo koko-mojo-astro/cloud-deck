@@ -42,13 +42,12 @@ export const initSocketServer = (httpServer: HttpServer) => {
     SocketData
   >(httpServer, {
     cors: {
-      origin: [
-        'http://localhost:3000',
+      origin: process.env.NODE_ENV === 'development' ? true : [
         'https://cloud-deck.vercel.app',
         ...(process.env.VERCEL_URL ? [`https://${process.env.VERCEL_URL}`] : []),
         ...(process.env.VERCEL_BRANCH_URL ? [`https://${process.env.VERCEL_BRANCH_URL}`] : []),
         // Allow all Vercel preview deployments
-        /^https:\/\/cloud-deck-git-.*-.*\.vercel\.app$/
+        /https:\/\/cloud-deck[\w-]*\.vercel\.app$/
       ].filter(Boolean),
       methods: ['GET', 'POST'],
       credentials: true,
