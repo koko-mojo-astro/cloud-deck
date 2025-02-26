@@ -7,6 +7,9 @@ const dev = process.env.NODE_ENV !== 'production';
 const app = next({ dev });
 const handle = app.getRequestHandler();
 
+const PORT = parseInt(process.env.PORT || '3000', 10);
+const HOST = process.env.HOST || '0.0.0.0';
+
 app.prepare().then(() => {
     const server = createServer((req, res) => {
         const parsedUrl = parse(req.url!, true);
@@ -22,7 +25,10 @@ app.prepare().then(() => {
 
     const io = initSocketServer(server);
 
-    server.listen(3000, () => {
-        console.log('> Ready on http://localhost:3000');
+    server.listen(PORT, HOST, () => {
+        console.log(`> Ready on http://${HOST}:${PORT}`);
+    }).on('error', (err) => {
+        console.error('Failed to start server:', err);
+        process.exit(1);
     });
 });

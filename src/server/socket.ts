@@ -42,9 +42,9 @@ export const initSocketServer = (httpServer: HttpServer) => {
     SocketData
   >(httpServer, {
     cors: {
-      origin: process.env.NODE_ENV === 'production' 
-        ? process.env.NEXT_PUBLIC_APP_URL || 'https://cloud-deck.vercel.app'
-        : 'http://localhost:3000',
+      origin: process.env.NODE_ENV === 'development'
+        ? 'http://localhost:3000'
+        : process.env.NEXT_PUBLIC_APP_URL || 'https://cloud-deck.vercel.app',
       methods: ['GET', 'POST'],
       credentials: true
     },
