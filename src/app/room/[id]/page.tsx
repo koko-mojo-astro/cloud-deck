@@ -38,7 +38,9 @@ export default function RoomPage() {
 
 		const newSocket = io(window.location.origin, {
 			path: '/socket.io',
-			transports: ['websocket', 'polling']
+			transports: ['websocket', 'polling'],
+			reconnectionAttempts: 5,
+			reconnectionDelay: 1000,
 		})
 		setSocket(newSocket)
 

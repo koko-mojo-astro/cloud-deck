@@ -8,27 +8,51 @@ const app = next({ dev });
 const handle = app.getRequestHandler();
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
-const HOST = process.env.HOST || '0.0.0.0';
+const HOST = process.env.RENDER_EXTERNAL_HOSTNAME || '0.0.0.0';
 
 app.prepare().then(() => {
     const server = createServer((req, res) => {
-        const parsedUrl = parse(req.url!, true);
-        // Check if the request is for Socket.IO
+        if (!req.url) {
+            res.statusCode = 400;
+            res.end('Bad Request: Missing URL');
+            return;
+        }
+        const parsedUrl = parse(req.url, true);
+        // Enhanced Socket.IO routing
         if (parsedUrl.pathname?.startsWith('/socket.io')) {
-            // Let Socket.IO handle its own routing
             res.statusCode = 200;
             return;
         }
-        // Otherwise, let Next.js handle the request
-        handle(req, res, parsedUrl);
+        // Handle Next.js requests
+        handle(req, res, parsedUrl).catch(err => {
+            console.error('Error handling request:', err);
+            res.statusCode = 500;
+            res.end('Internal Server Error');
+        });
     });
 
     const io = initSocketServer(server);
 
     server.listen(PORT, HOST, () => {
+        console.log(`> Server running in ${dev ? 'development' : 'production'} mode`);
         console.log(`> Ready on http://${HOST}:${PORT}`);
     }).on('error', (err) => {
         console.error('Failed to start server:', err);
         process.exit(1);
     });
+
+    // Graceful shutdown
+    const shutdown = () => {
+        console.log('Received termination signal. Closing server...');
+        server.close(() => {
+            console.log('Server closed');
+            process.exit(0);
+        });
+    };
+
+    process.on('SIGTERM', shutdown);
+    process.on('SIGINT', shutdown);
+}).catch(err => {
+    console.error('Error during Next.js initialization:', err);
+    process.exit(1);
 });

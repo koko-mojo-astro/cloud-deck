@@ -42,13 +42,7 @@ export const initSocketServer = (httpServer: HttpServer) => {
     SocketData
   >(httpServer, {
     cors: {
-      origin: process.env.NODE_ENV === 'development'
-        ? true
-        : [
-            process.env.RENDER_EXTERNAL_URL || 'http://localhost:3000',
-            // Allow all subdomains on render.com
-            /https?:\/\/.*\.onrender\.com$/
-          ],
+      origin: '*',
       methods: ['GET', 'POST'],
       credentials: true,
       allowedHeaders: ['Content-Type']
