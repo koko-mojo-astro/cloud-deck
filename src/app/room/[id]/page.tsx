@@ -35,15 +35,15 @@ export default function RoomPage() {
 			setError('Name is required')
 			return
 		}
-		const socket_url =
-			process.env.NODE_ENV === 'development'
-				? 'http://localhost:3000'
-				: process.env.RENDER_EXTERNAL_URL + ':3000'
+		const socket_url = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3000'
 		const newSocket = io(socket_url, {
 			path: '/socket.io',
 			transports: ['websocket', 'polling'],
 			reconnectionAttempts: 5,
 			reconnectionDelay: 1000,
+			timeout: 10000,
+			autoConnect: true,
+			forceNew: true
 		})
 		setSocket(newSocket)
 

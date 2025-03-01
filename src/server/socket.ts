@@ -2,7 +2,7 @@ import { Server as HttpServer } from 'http';
 import { Server } from 'socket.io';
 import { FIBONACCI_SEQUENCE, Room, User } from '@/types/room';
 
-interface ServerToClientEvents {
+export interface ServerToClientEvents {
   roomUpdated: (room: Room) => void;
   userJoined: (user: User) => void;
   userLeft: (userId: string) => void;
@@ -13,7 +13,7 @@ interface ServerToClientEvents {
   countdownStarted: () => void;
 }
 
-interface ClientToServerEvents {
+export interface ClientToServerEvents {
   joinRoom: (roomId: string, user: User) => void;
   leaveRoom: (roomId: string, userId: string) => void;
   startVoting: (roomId: string) => void;
@@ -42,14 +42,16 @@ export const initSocketServer = (httpServer: HttpServer) => {
     SocketData
   >(httpServer, {
     cors: {
-      origin: '*',
+      origin: process.env.NODE_ENV === 'production' 
+        ? [process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000']
+        : ['http://localhost:3000'],
       methods: ['GET', 'POST'],
       credentials: true,
-      allowedHeaders: ['Content-Type']
     },
+    path: '/socket.io',
     transports: ['websocket', 'polling'],
     pingTimeout: 60000,
-    pingInterval: 25000
+    pingInterval: 25000,
   });
 
   io.on('connection', (socket) => {
