@@ -42,9 +42,7 @@ export const initSocketServer = (httpServer: HttpServer) => {
     SocketData
   >(httpServer, {
     cors: {
-      origin: process.env.NODE_ENV === 'production' 
-        ? [process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000']
-        : ['http://localhost:3000'],
+      origin: '*', // For production, you might want to restrict this
       methods: ['GET', 'POST'],
       credentials: true,
     },

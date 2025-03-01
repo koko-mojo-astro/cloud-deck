@@ -7,8 +7,9 @@ const dev = process.env.NODE_ENV !== 'production';
 const app = next({ dev });
 const handle = app.getRequestHandler();
 
-const PORT = process.env.PORT || 3000;
-const HOST = process.env.HOST || '0.0.0.0';
+// Update port and host configuration for Render
+const PORT = Number(process.env.PORT) || 3000;
+const HOST = '0.0.0.0'; // This allows connections from all network interfaces
 
 app.prepare().then(() => {
   const server = createServer((req, res) => {
@@ -27,7 +28,7 @@ app.prepare().then(() => {
 
   const io = initSocketServer(server);
 
-  server.listen(Number(PORT), HOST, () => {
-    console.log(`> Ready on http://${HOST}:${PORT}`);
+    server.listen(PORT, HOST, () => {
+        console.log(`> Server listening on ${HOST}:${PORT}`);
   });
 });

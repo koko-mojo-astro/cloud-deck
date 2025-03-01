@@ -4,6 +4,11 @@ import { ClientToServerEvents, ServerToClientEvents } from '../server/socket';
 const getSocketUrl = () => {
   if (typeof window === 'undefined') return '';
   
+  // For production, always use the NEXT_PUBLIC_SOCKET_URL
+  if (process.env.NODE_ENV === 'production') {
+    return process.env.NEXT_PUBLIC_SOCKET_URL;
+  }
+  
   return process.env.NEXT_PUBLIC_SOCKET_URL || window.location.origin;
 };
 
