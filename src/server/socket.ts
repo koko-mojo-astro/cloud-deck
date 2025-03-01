@@ -42,7 +42,7 @@ export const initSocketServer = (httpServer: HttpServer) => {
     SocketData
   >(httpServer, {
     cors: {
-      origin: '*', // For production, you might want to restrict this
+      origin: process.env.RENDER_EXTERNAL_URL || process.env.NEXT_PUBLIC_SOCKET_URL, // For production, you might want to restrict this
       methods: ['GET', 'POST'],
       credentials: true,
     },

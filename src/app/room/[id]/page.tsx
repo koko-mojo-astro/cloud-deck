@@ -36,14 +36,14 @@ export default function RoomPage() {
 			return
 		}
 		const socket_url = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3000'
-		const newSocket = io(socket_url, {
+		const newSocket = io({
 			path: '/socket.io',
 			transports: ['websocket', 'polling'],
 			reconnectionAttempts: 5,
 			reconnectionDelay: 1000,
 			timeout: 10000,
 			autoConnect: true,
-			forceNew: true
+			forceNew: true,
 		})
 		setSocket(newSocket)
 
