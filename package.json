@@ -5,9 +5,9 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "node -r @swc-node/register src/server/index.ts",
     "lint": "next lint",
-    "dev:server": "node -r @swc-node/register server.js"
+    "dev:server": "node -r @swc-node/register src/server/index.ts"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.0",
