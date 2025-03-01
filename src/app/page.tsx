@@ -22,22 +22,12 @@ export default function Home() {
 	const handleCreateRoom = () => {
 		if (!name.trim()) return
 		const roomId = Math.random().toString(36).substring(2, 8)
-		const votingOptions =
-			votingSystem === 'custom'
-				? customDeck
-						.split(',')
-						.map((value) => parseFloat(value.trim()))
-						.filter((value) => !isNaN(value))
-				: VOTING_SYSTEMS[votingSystem]
-
 		router.push(
 			`/room/${roomId}?name=${encodeURIComponent(
 				name
 			)}&roomName=${encodeURIComponent(
 				roomName || 'Planning Poker Room'
-			)}&role=admin&votingOptions=${encodeURIComponent(
-				JSON.stringify(votingOptions)
-			)}`
+			)}&role=admin`
 		)
 	}
 

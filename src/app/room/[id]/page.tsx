@@ -56,7 +56,7 @@ export default function RoomPage() {
 			hasVoted: false,
 			role: role as 'estimator' | 'observer' | 'admin',
 			roomName,
-			votingOptions: role === 'admin' ? FIBONACCI_SEQUENCE : undefined,
+			votingOptions: FIBONACCI_SEQUENCE,
 		}
 		setCurrentUser(user)
 
@@ -84,6 +84,11 @@ export default function RoomPage() {
 		})
 
 		newSocket.on('roomUpdated', (updatedRoom: Room) => {
+			// Update current user's vote from the room state
+			const updatedCurrentUser = updatedRoom.users.find(u => u.id === user.id)
+			if (updatedCurrentUser) {
+				setCurrentUser(updatedCurrentUser)
+			}
 			// Reset current user's vote if voting options have changed
 			if (
 				room &&
@@ -221,7 +226,7 @@ export default function RoomPage() {
 	// Calculate progress percentage for the timer
 	const timerProgress =
 		timeLeft !== null ? (timeLeft / DEFAULT_TIMER_DURATION) * 100 : 0
-
+	// Vote state is managed through socket events
 	return (
 		<>
 			{countdown !== null && (
