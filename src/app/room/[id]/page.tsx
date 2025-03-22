@@ -13,7 +13,6 @@ import VotingControls from './components/VotingControls'
 import PlayerCard from './components/PlayerCard'
 import VotingResults from './components/VotingResults'
 import Image from 'next/image'
-import meniconLogo from '../../../public/menicon-logo.png'
 import vercelLogo from '../../../public/vercel.svg'
 export default function RoomPage() {
 	const params = useParams()
@@ -28,6 +27,7 @@ export default function RoomPage() {
 	const [voteStats, setVoteStats] = useState<{ [key: number]: number }>({})
 	const [countdown, setCountdown] = useState<number | null>(null)
 	const [showResults, setShowResults] = useState(false)
+	const [currentPage, setCurrentPage] = useState(0)
 
 	useEffect(() => {
 		const name = searchParams.get('name')
@@ -35,7 +35,8 @@ export default function RoomPage() {
 			setError('Name is required')
 			return
 		}
-		const socket_url = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3000'
+		const socket_url =
+			process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3000'
 		const newSocket = io({
 			path: '/socket.io',
 			transports: ['websocket', 'polling'],
@@ -85,7 +86,7 @@ export default function RoomPage() {
 
 		newSocket.on('roomUpdated', (updatedRoom: Room) => {
 			// Update current user's vote from the room state
-			const updatedCurrentUser = updatedRoom.users.find(u => u.id === user.id)
+			const updatedCurrentUser = updatedRoom.users.find((u) => u.id === user.id)
 			if (updatedCurrentUser) {
 				setCurrentUser(updatedCurrentUser)
 			}
@@ -223,6 +224,25 @@ export default function RoomPage() {
 		setTimeout(() => setInviteToast(''), 3000)
 	}
 
+	// Calculate total pages based on number of users
+	const playersPerPage = 10
+	const totalPages = Math.ceil((room?.users?.length || 0) / playersPerPage)
+		? Math.ceil(room.users.length / playersPerPage)
+		: 1
+
+	// Functions to navigate between pages
+	const goToNextPage = () => {
+		if (currentPage < totalPages - 1) {
+			setCurrentPage(currentPage + 1)
+		}
+	}
+
+	const goToPrevPage = () => {
+		if (currentPage > 0) {
+			setCurrentPage(currentPage - 1)
+		}
+	}
+
 	// Calculate progress percentage for the timer
 	const timerProgress =
 		timeLeft !== null ? (timeLeft / DEFAULT_TIMER_DURATION) * 100 : 0
@@ -242,17 +262,17 @@ export default function RoomPage() {
 					</div>
 				</div>
 			)}
-			<div className='h-dvh bg-gradient-to-b from-white to-gray-100 dark:from-black dark:to-gray-800 p-4 md:p-8 overflow-x-hidden overflow-y-auto'>
-				<div className='max-w-6xl mx-auto w-full h-full flex flex-col justify-between'>
-					<div className='flex flex-2 flex-col md:flex-row justify-between items-center mb-8 gap-4'>
-						<div className='flex flex-col items-start w-auto'>
-							<h1 className='text-3xl flex font-bold text-gray-900 dark:text-white mb-4'>
+			<div className='min-h-dvh bg-gradient-to-b from-white to-gray-100 dark:from-black dark:to-gray-800 p-4 md:p-8 overflow-x-hidden overflow-y-auto'>
+				<div className='max-w-6xl mx-auto w-full min-h-full flex flex-col justify-between'>
+					<div className='flex flex-col md:flex-row justify-between items-center mb-4 md:mb-8 gap-4'>
+						<div className='flex flex-col items-start w-full md:w-auto'>
+							<h1 className='text-2xl md:text-3xl flex font-bold text-gray-900 dark:text-white mb-2 md:mb-4'>
 								{currentUser?.roomName || 'Planning Poker Room'}
 							</h1>
 						</div>
-						<div className='flex items-center gap-4 flex-wrap justify-center relative'>
+						<div className='flex items-center gap-2 md:gap-4 flex-wrap justify-center relative w-full md:w-auto'>
 							{inviteToast && (
-								<div className='fixed top-28 w-1/8 left-4/5 transform bg-[#ffffff] z-10 text-black border border-l-[4px] border-l-teal-500 px-6 py-3 duration-500'>
+								<div className='fixed top-28 left-4 right-4 md:left-auto md:right-4 md:w-80 transform bg-[#ffffff] z-10 text-black border border-l-[4px] border-l-teal-500 px-6 py-3 duration-500 shadow-md'>
 									{inviteToast}
 								</div>
 							)}
@@ -261,7 +281,7 @@ export default function RoomPage() {
 									{!room.isVoting && (
 										<button
 											onClick={handleStartVoting}
-											className='px-4 py-2 bg-[#00A550] hover:bg-[#008040] text-white rounded-md'
+											className='px-3 md:px-4 py-2 bg-[#00A550] hover:bg-[#008040] text-white rounded-md text-sm md:text-base'
 										>
 											Start Voting
 										</button>
@@ -274,7 +294,7 @@ export default function RoomPage() {
 													(user) => user.role !== 'estimator' || user.hasVoted
 												)
 											}
-											className='px-4 py-2 bg-[#00A550] hover:bg-[#008040] text-white rounded-md shadow-sm transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed'
+											className='px-3 md:px-4 py-2 bg-[#00A550] hover:bg-[#008040] text-white rounded-md shadow-sm transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm md:text-base'
 										>
 											Reveal Votes
 										</button>
@@ -283,13 +303,13 @@ export default function RoomPage() {
 										<div className='flex gap-2 flex-wrap justify-center'>
 											<button
 												onClick={handleResetVotes}
-												className='px-4 py-2 bg-[#EC1C24] hover:bg-[#D01017] text-white rounded-md shadow-sm transition-colors duration-200'
+												className='px-3 md:px-4 py-2 bg-[#EC1C24] hover:bg-[#D01017] text-white rounded-md shadow-sm transition-colors duration-200 text-sm md:text-base'
 											>
 												Reset
 											</button>
 											<button
 												onClick={() => setShowResults(true)}
-												className='px-4 py-2 bg-[#00A550] hover:bg-[#008040] text-white rounded-md shadow-sm transition-colors duration-200'
+												className='px-3 md:px-4 py-2 bg-[#00A550] hover:bg-[#008040] text-white rounded-md shadow-sm transition-colors duration-200 text-sm md:text-base'
 											>
 												View Results
 											</button>
@@ -297,7 +317,7 @@ export default function RoomPage() {
 									)}
 									<button
 										onClick={handleCopyInviteLink}
-										className='px-4 py-2 bg-[#00A550] hover:bg-[#008040] text-white rounded-md shadow-sm transition-colors duration-200'
+										className='px-3 md:px-4 py-2 bg-[#00A550] hover:bg-[#008040] text-white rounded-md shadow-sm transition-colors duration-200 text-sm md:text-base'
 									>
 										{inviteToast ? 'Copied!' : 'Invite Team'}
 									</button>
@@ -306,9 +326,9 @@ export default function RoomPage() {
 						</div>
 					</div>
 
-					<div className='flex-2 flex flex-col gap-8'>
-						<div className='w-full flex items-center justify-center mb-8'>
-							<div className='relative h-[200px] w-[400px]'>
+					<div className='flex-1 flex flex-col min-h-[500px] gap-4 md:gap-8 overflow-y-auto justify-center'>
+						<div className='w-full flex items-center justify-center mt-8'>
+							<div className='relative h-[170px] sm:h-[150px] w-[230px] sm:w-[250px] md:w-[300px]'>
 								<div className='w-full h-full bg-[#2A2A2A] rounded-lg flex flex-col items-center justify-center shadow-2xl'>
 									<div className='w-[95%] h-[85%] bg-[#333333] rounded-lg flex flex-col items-center justify-center shadow-inner relative'>
 										<Image
@@ -323,108 +343,89 @@ export default function RoomPage() {
 										</h2>
 									</div>
 								</div>
-								{/* Players around the rectangular table */}
+								{/* Players around the table in a circle */}
 								<div className='absolute inset-0'>
 									{room.users.map((user, index) => {
-										// Calculate positions for optimal spacing
+										// Calculate positions for circular arrangement
 										let left, top
 										let position: 'top' | 'bottom' | 'left' | 'right' = 'top'
 										const totalPlayers = room.users.length
 
-										// Distribute players based on total count
-										if (totalPlayers === 1) {
-											// For 2 players, place them facing each other
-											if (index === 0) {
-												left = 50
-												top = -40
-												position = 'top'
-											}
-										} else if (totalPlayers === 2) {
-											// For 2 players, place them facing each other
-											if (index === 0) {
-												left = 50
-												top = -40
-												position = 'top'
-											} else {
-												left = 50
-												top = 140
-												position = 'bottom'
-											}
-										} else if (totalPlayers === 3) {
-											// For 3 players, distribute on three sides
-											switch (index) {
-												case 0: // Top
-													left = 50
-													top = -40
-													position = 'top'
-													break
-												case 1: // Right
-													left = 120 // Moved away from edge
-													top = 50
-													position = 'right'
-													break
-												case 2: // Left
-													left = -20 // Moved away from edge
-													top = 50
-													position = 'left'
-													break
-											}
-										} else if (totalPlayers === 4) {
-											// For 4 players, one on each side
-											switch (index) {
-												case 0: // Top
-													left = 50
-													top = -40
-													position = 'top'
-													break
-												case 1: // Right
-													left = 120 // Moved away from edge
-													top = 50
-													position = 'right'
-													break
-												case 2: // Bottom
-													left = 50
-													top = 140
-													position = 'bottom'
-													break
-												case 3: // Left
-													left = -20 // Moved away from edge
-													top = 50
-													position = 'left'
-													break
-											}
+										// Responsive adjustments for player positioning
+										const isSmallScreen =
+											typeof window !== 'undefined' && window.innerWidth < 640
+										const isMediumScreen =
+											typeof window !== 'undefined' &&
+											window.innerWidth >= 640 &&
+											window.innerWidth < 768
+
+										// Adjust radius based on screen size and number of players
+										const baseRadius = isSmallScreen ? 100 : 200
+										// Increase radius slightly for more players to prevent overlap
+										const radius = baseRadius * (1 + Math.min(0.2, (totalPlayers - 4) * 0.02))
+
+										// For pagination with more than 10 players
+										const playersPerPage = 10
+										const pageStartIndex = currentPage * playersPerPage
+										const pageEndIndex = pageStartIndex + playersPerPage
+
+										// Skip rendering players not in the current page
+										if (totalPlayers > playersPerPage && (index < pageStartIndex || index >= pageEndIndex)) {
+											return null
+										}
+
+										// Calculate the player's position within the current page
+										const playerIndexInPage = totalPlayers > playersPerPage ? index - pageStartIndex : index
+										const visiblePlayers = totalPlayers > playersPerPage ? 
+											Math.min(playersPerPage, totalPlayers - pageStartIndex) : totalPlayers
+
+										// Special case for 1 player
+										if (visiblePlayers === 1) {
+											left = 50
+											top = -40 // Reduced distance from table
+											position = 'top'
 										} else {
-											// For 5+ players, distribute evenly around the table
-											const angle =
-												index * ((2 * Math.PI) / totalPlayers) - Math.PI / 2
-											const radius = 200 // Increased radius for better spacing
-											const leftDivider = 2.5
-											const topDivider = 2
-
-											// Adjust the position calculations for better distribution
-											left = 50 + (radius * Math.cos(angle)) / leftDivider // Adjusted divisor for X-axis
-											top = 60 + (radius * Math.sin(angle)) / topDivider // Adjusted divisor for Y-axis
-
-											// Determine position based on angle
-											if (angle >= -Math.PI / 4 && angle < Math.PI / 4)
-												position = 'right'
-											else if (
-												angle >= Math.PI / 4 &&
-												angle < (3 * Math.PI) / 4
-											)
-												position = 'bottom'
-											else if (
-												angle >= (-3 * Math.PI) / 4 &&
-												angle < -Math.PI / 4
-											)
+											// Calculate angle for each player in a circle
+											// Start from the top (270 degrees) and distribute evenly
+											const angleStep = 360 / visiblePlayers
+											// Offset the starting angle to place first player at the top
+											const startAngle = 270
+											const angle = startAngle + playerIndexInPage * angleStep
+											
+											// Convert angle to radians for Math.sin and Math.cos
+											const angleRad = (angle * Math.PI) / 180
+											
+											// Calculate position using trigonometry
+											// Center is at (50%, 50%)
+											left = 50 + radius * Math.cos(angleRad) / 2
+											
+											// Adjust top position - add extra distance for cards at the top and bottom
+											let topAdjustment = 0
+											if (angle > 225 && angle < 315) {
+												// For cards at the top, add extra distance
+												topAdjustment = -15 // Reduced extra distance from table for top cards
+											} else if (angle > 45 && angle < 135) {
+												// For cards at the bottom, add extra distance
+												topAdjustment = 20 // Reduced extra distance from table for bottom cards
+											}
+											top = 60 + (radius * Math.sin(angleRad) / 2) + topAdjustment
+											
+											// Determine card orientation based on position
+											if (angle > 225 && angle < 315) {
 												position = 'top'
-											else position = 'left'
+											} else if (angle >= 315 || angle < 45) {
+												position = 'right'
+											} else if (angle >= 45 && angle < 135) {
+												position = 'bottom'
+											} else {
+												position = 'left'
+											}
 										}
 
 										return (
 											<div
 												key={user.id}
-												className='absolute transform -translate-x-1/2 -translate-y-1/2'
+												className='absolute transform -translate-x-1/2 -translate-y-1/2 transition-all duration-500 ease-in-out'
 												style={{
 													left: `${left}%`,
 													top: `${top}%`,
@@ -449,15 +450,45 @@ export default function RoomPage() {
 								</div>
 							</div>
 						</div>
-						<div className='w-full'>
+						{/* Pagination controls for when there are more than 10 users */}
+						{room && room.users.length > 10 && (
+							<div className='flex justify-center items-center mt-4 mb-4 space-x-4'>
+								<button
+									onClick={goToPrevPage}
+									disabled={currentPage === 0}
+									className='px-3 py-1 bg-[#00A550] text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed'
+								>
+									&larr; Previous
+								</button>
+								<span className='text-sm text-gray-600 dark:text-gray-300'>
+									Page {currentPage + 1} of {totalPages} ({room.users.length}{' '}
+									players)
+								</span>
+								<button
+									onClick={goToNextPage}
+									disabled={currentPage >= totalPages - 1}
+									className='px-3 py-1 bg-[#00A550] text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed'
+								>
+									Next &rarr;
+								</button>
+							</div>
+						)}
+						{/* Display voting results below the table and above player cards */}
+						<div
+							className={`${room.revealed
+								? 'block w-full mt-8 mb-8 relative z-10'
+								: 'hidden'}`}
+						>
 							<VotingResults
 								voteStats={voteStats}
 								revealed={room.revealed}
 								showResults={showResults}
 								onClose={() => setShowResults(false)}
+								inline={true}
 							/>
 						</div>
 					</div>
+
 					{currentUser && (
 						<VotingControls
 							onVote={handleVote}
