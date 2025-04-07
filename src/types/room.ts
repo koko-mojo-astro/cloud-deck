@@ -20,6 +20,7 @@ export interface Room {
   timerDuration: number; // in seconds
   revealed: boolean;
   votingOptions: number[];
+  enabled: boolean; // Whether the room is enabled for voting
 }
 
 export interface RoomState extends Room {
@@ -28,4 +29,4 @@ export interface RoomState extends Room {
 
 export const FIBONACCI_SEQUENCE = [1, 2, 3, 5, 8, 13, 21];
 
-export const DEFAULT_TIMER_DURATION = 30; // 30 seconds
+export const DEFAULT_TIMER_DURATION = 15; // 15 seconds

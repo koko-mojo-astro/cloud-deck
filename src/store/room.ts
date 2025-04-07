@@ -11,6 +11,8 @@ interface RoomStore extends RoomState {
   revealVotes: () => void;
   resetVotes: () => void;
   updateTimer: (duration: number) => void;
+  toggleRoomEnabled: (enabled: boolean) => void;
+  setRoomTimer: (duration: number) => void;
 }
 
 const initialState: RoomState = {
@@ -23,6 +25,7 @@ const initialState: RoomState = {
   timerDuration: DEFAULT_TIMER_DURATION,
   revealed: false,
   votingOptions: FIBONACCI_SEQUENCE,
+  enabled: true,
   currentUser: null
 };
 
@@ -68,5 +71,7 @@ export const useRoomStore = create<RoomStore>((set) => ({
       isVoting: false,
       timerStartedAt: null
     })),
-  updateTimer: (duration) => set({ timerDuration: duration })
+  updateTimer: (duration) => set({ timerDuration: duration }),
+  toggleRoomEnabled: (enabled) => set({ enabled }),
+  setRoomTimer: (duration) => set({ timerDuration: duration })
 }));

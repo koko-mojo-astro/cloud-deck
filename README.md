@@ -4,13 +4,12 @@ A modern, real-time web application built with Next.js that leverages WebSocket 
 
 ## Features
 
-- Real-time collaboration using Socket.IO
-- Modern UI components with Headless UI and Hero Icons
-- Responsive design with Tailwind CSS
-- Smooth animations with Framer Motion
-- Type-safe development with TypeScript
-- State management using Zustand
-- Server-side rendering with Next.js
+*   **Real-Time Collaboration:** Work together seamlessly! See votes and updates appear instantly for everyone in the room.
+*   **Modern & Clean Interface:** Enjoy a polished user experience with intuitive controls and clear visuals.
+*   **Works on Any Device:** Use Cloud Deck comfortably on your desktop, tablet, or mobile phone thanks to its responsive design.
+*   **Smooth Animations:** Interactions feel fluid and natural with subtle animations.
+*   **Admin Controls:** Manage your planning sessions with options for room status and timers (for admins).
+*   **Invite Your Team:** Easily share a link to bring your team members into the session.
 
 ## Installation
 
@@ -90,14 +89,15 @@ Branch protection rules:
 ## Tech Stack
 
 - Next.js 15.1.7
-- React 19
-- Socket.IO
-- TypeScript
-- Tailwind CSS
-- Headless UI
-- Framer Motion
-- Zustand
+- React 19.0.0
+- Socket.IO 4.8.1 (and Socket.IO Client 4.8.1)
+- TypeScript 5
+- Tailwind CSS 3.4.1
+- Headless UI 2.2.0
+- Hero Icons 2.2.0
+- Framer Motion 12.4.5
+- Zustand 5.0.3
 
 ## License
 
-Private Repository - All rights reserved.
+All Rights Reserved.

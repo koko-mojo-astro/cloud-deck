@@ -1,6 +1,6 @@
 import { Server as HttpServer } from 'http';
 import { Server } from 'socket.io';
-import { FIBONACCI_SEQUENCE, Room, User } from '@/types/room';
+import { DEFAULT_TIMER_DURATION, FIBONACCI_SEQUENCE, Room, User } from '@/types/room';
 
 export interface ServerToClientEvents {
   roomUpdated: (room: Room) => void;
@@ -23,6 +23,8 @@ export interface ClientToServerEvents {
   resetVotes: (roomId: string) => void;
   updateTimer: (roomId: string, duration: number) => void;
   updateVotingSystem: (roomId: string, options: number[]) => void;
+  toggleRoomEnabled: (roomId: string, enabled: boolean) => void;
+  setRoomTimer: (roomId: string, duration: number) => void;
 }
 
 interface InterServerEvents { }
@@ -68,9 +70,10 @@ export const initSocketServer = (httpServer: HttpServer) => {
           users: [],
           isVoting: false,
           timerStartedAt: null,
-          timerDuration: 30,
+          timerDuration: DEFAULT_TIMER_DURATION, // Use imported constant
           revealed: false,
-          votingOptions: FIBONACCI_SEQUENCE
+          votingOptions: FIBONACCI_SEQUENCE,
+          enabled: true // Room is enabled by default
         };
       }
 
@@ -129,11 +132,35 @@ export const initSocketServer = (httpServer: HttpServer) => {
       const room = rooms.get(roomId);
       if (room) {
         const user = room.users.find((u) => u.id === userId);
-        if (user) {
+        if (user && room.isVoting) { // Ensure voting is active
           user.vote = vote;
           user.hasVoted = true;
-          rooms.set(roomId, room);
-          io.to(roomId).emit('roomUpdated', room);
+
+          // Check if all estimators have voted
+          const estimators = room.users.filter((u) => u.role === 'estimator');
+          // Ensure there are estimators and all of them have voted
+          const allEstimatorsVoted = estimators.length > 0 && estimators.every((e) => e.hasVoted);
+
+          // --- DEBUG LOGGING ---
+          console.log(`[Vote Submitted] User: ${userId}, Vote: ${vote}, Room: ${roomId}`);
+          console.log(`  Estimators: ${estimators.length}, Voted: ${estimators.filter(e => e.hasVoted).length}`);
+          console.log(`  All Estimators Voted Condition: ${allEstimatorsVoted}`);
+          // --- END DEBUG LOGGING ---
+
+          if (allEstimatorsVoted) {
+            console.log(`[Auto-Revealing] Room: ${roomId}`); // Log auto-reveal action
+            // End voting and reveal immediately
+            room.isVoting = false;
+            room.timerStartedAt = null;
+            room.revealed = true;
+            rooms.set(roomId, room); // Update the room state first
+            // Only emit roomUpdated, as it contains isVoting=false and revealed=true
+            io.to(roomId).emit('roomUpdated', room);
+          } else {
+          // Just update the room state if not everyone has voted yet
+            rooms.set(roomId, room);
+            io.to(roomId).emit('roomUpdated', room);
+          }
         }
       }
     });
@@ -165,6 +192,24 @@ export const initSocketServer = (httpServer: HttpServer) => {
     });
 
     socket.on('updateTimer', (roomId, duration) => {
+      const room = rooms.get(roomId);
+      if (room) {
+        room.timerDuration = duration;
+        rooms.set(roomId, room);
+        io.to(roomId).emit('roomUpdated', room);
+      }
+    });
+
+    socket.on('toggleRoomEnabled', (roomId, enabled) => {
+      const room = rooms.get(roomId);
+      if (room) {
+        room.enabled = enabled;
+        rooms.set(roomId, room);
+        io.to(roomId).emit('roomUpdated', room);
+      }
+    });
+
+    socket.on('setRoomTimer', (roomId, duration) => {
       const room = rooms.get(roomId);
       if (room) {
         room.timerDuration = duration;
