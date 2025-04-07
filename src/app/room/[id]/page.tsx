@@ -12,9 +12,12 @@ import {
 import VotingControls from './components/VotingControls'
 import PlayerCard from './components/PlayerCard'
 import VotingResults from './components/VotingResults'
+import AdminControls from './components/AdminControls'
 import Image from 'next/image'
 import vercelLogo from '../../../public/vercel.svg'
+
 export default function RoomPage() {
+	const [showAdminControls, setShowAdminControls] = useState(false)
 	const params = useParams()
 	const searchParams = useSearchParams()
 	const [socket, setSocket] = useState<Socket | null>(null)
@@ -24,13 +27,11 @@ export default function RoomPage() {
 	const [inviteToast, setInviteToast] = useState('')
 	const [currentUser, setCurrentUser] = useState<User | null>(null)
 	const [timeLeft, setTimeLeft] = useState<number | null>(null)
-	const [voteStats, setVoteStats] = useState<{ [key: number]: number }>({})
 	const [countdown, setCountdown] = useState<number | null>(null)
-	const [showResults, setShowResults] = useState(false)
 	const [currentPage, setCurrentPage] = useState(0)
 
 	useEffect(() => {
-		const name = searchParams.get('name')
+		const name = searchParams?.get('name')
 		if (!name) {
 			setError('Name is required')
 			return
@@ -48,8 +49,8 @@ export default function RoomPage() {
 		})
 		setSocket(newSocket)
 
-		const role = searchParams.get('role') || 'estimator'
-		const roomName = searchParams.get('roomName') || 'Planning Poker Room'
+		const role = searchParams?.get('role') || 'estimator'
+		const roomName = searchParams?.get('roomName') || 'Planning Poker Room'
 		const user: User = {
 			id: Math.random().toString(36).substring(2, 9),
 			name,
@@ -62,7 +63,7 @@ export default function RoomPage() {
 		setCurrentUser(user)
 
 		newSocket.on('connect', () => {
-			newSocket.emit('joinRoom', params.id as string, user)
+			newSocket.emit('joinRoom', params?.id as string, user)
 		})
 
 		newSocket.on('countdownStarted', () => {
@@ -100,7 +101,7 @@ export default function RoomPage() {
 			}
 
 			setRoom(updatedRoom)
-			const url = `${window.location.origin}/join/${params.id}`
+			const url = `${window.location.origin}/join/${params?.id}`
 			setInviteUrl(url)
 
 			// Handle timer updates
@@ -115,19 +116,6 @@ export default function RoomPage() {
 			} else {
 				setTimeLeft(null)
 			}
-
-			// Calculate vote statistics
-			if (updatedRoom.revealed) {
-				const stats: { [key: number]: number } = {}
-				updatedRoom.users.forEach((user) => {
-					if (user.vote !== null) {
-						stats[user.vote] = (stats[user.vote] || 0) + 1
-					}
-				})
-				setVoteStats(stats)
-			} else {
-				setVoteStats({})
-			}
 		})
 
 		newSocket.on('connect_error', () => {
@@ -136,11 +124,11 @@ export default function RoomPage() {
 
 		return () => {
 			if (newSocket) {
-				newSocket.emit('leaveRoom', params.id as string, user.id)
+				newSocket.emit('leaveRoom', params?.id as string, user.id)
 				newSocket.disconnect()
 			}
 		}
-	}, [params.id, searchParams])
+	}, [params?.id, searchParams])
 
 	// Timer countdown effect
 	useEffect(() => {
@@ -191,6 +179,19 @@ export default function RoomPage() {
 		}
 	}
 
+	// Admin handlers for room enabling/disabling and timer settings
+	const handleToggleRoomEnabled = (enabled: boolean) => {
+		if (socket && room) {
+			socket.emit('toggleRoomEnabled', room.id, enabled)
+		}
+	}
+
+	const handleSetRoomTimer = (duration: number) => {
+		if (socket && room) {
+			socket.emit('setRoomTimer', room.id, duration)
+		}
+	}
+
 	if (error) {
 		return (
 			<div className='min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800'>
@@ -214,7 +215,7 @@ export default function RoomPage() {
 	}
 
 	const handleCopyInviteLink = () => {
-		const url = `${window.location.origin}/join/${params.id}/?roomName=${
+		const url = `${window.location.origin}/join/${params?.id}/?roomName=${
 			currentUser?.roomName ? encodeURIComponent(currentUser?.roomName) : 'room'
 		}`
 		navigator.clipboard.writeText(url)
@@ -278,7 +279,7 @@ export default function RoomPage() {
 							)}
 							{currentUser?.role === 'admin' && (
 								<div className='flex gap-2 flex-wrap justify-center'>
-									{!room.isVoting && (
+									{!room.isVoting && room.enabled && !room.revealed && (
 										<button
 											onClick={handleStartVoting}
 											className='px-3 md:px-4 py-2 bg-[#00A550] hover:bg-[#008040] text-white rounded-md text-sm md:text-base'
@@ -286,7 +287,7 @@ export default function RoomPage() {
 											Start Voting
 										</button>
 									)}
-									{room.isVoting && !room.revealed && (
+									{room.isVoting && !room.revealed && room.enabled && (
 										<button
 											onClick={handleRevealVotes}
 											disabled={
@@ -307,12 +308,6 @@ export default function RoomPage() {
 											>
 												Reset
 											</button>
-											<button
-												onClick={() => setShowResults(true)}
-												className='px-3 md:px-4 py-2 bg-[#00A550] hover:bg-[#008040] text-white rounded-md shadow-sm transition-colors duration-200 text-sm md:text-base'
-											>
-												View Results
-											</button>
 										</div>
 									)}
 									<button
@@ -321,12 +316,28 @@ export default function RoomPage() {
 									>
 										{inviteToast ? 'Copied!' : 'Invite Team'}
 									</button>
+									<button
+										onClick={() => setShowAdminControls(true)}
+										className='px-3 md:px-4 py-2 bg-[#00A550] hover:bg-[#008040] text-white rounded-md shadow-sm transition-colors duration-200 text-sm md:text-base'
+									>
+										Admin Settings
+									</button>
 								</div>
 							)}
 						</div>
 					</div>
 
 					<div className='flex-1 flex flex-col min-h-[500px] gap-4 md:gap-8 overflow-y-auto justify-center'>
+						{/* Admin Controls Panel - Only visible to admin users */}
+						{currentUser?.role === 'admin' && (
+							<AdminControls
+								room={room}
+								onToggleRoomEnabled={handleToggleRoomEnabled}
+								onSetTimer={handleSetRoomTimer}
+								isOpen={showAdminControls}
+								onClose={() => setShowAdminControls(false)}
+							/>
+						)}
 						<div className='w-full flex items-center justify-center mt-8'>
 							<div className='relative h-[170px] sm:h-[150px] w-[230px] sm:w-[250px] md:w-[300px]'>
 								<div className='w-full h-full bg-[#2A2A2A] rounded-lg flex flex-col items-center justify-center shadow-2xl'>
@@ -362,7 +373,9 @@ export default function RoomPage() {
 										// Adjust radius based on screen size and number of players
 										const baseRadius = isSmallScreen ? 100 : 200
 										// Increase radius slightly for more players to prevent overlap
-										const radius = baseRadius * (1 + Math.min(0.2, (totalPlayers - 4) * 0.02))
+										const radius =
+											baseRadius *
+											(1 + Math.min(0.2, (totalPlayers - 4) * 0.02))
 
 										// For pagination with more than 10 players
 										const playersPerPage = 10
@@ -370,14 +383,25 @@ export default function RoomPage() {
 										const pageEndIndex = pageStartIndex + playersPerPage
 
 										// Skip rendering players not in the current page
-										if (totalPlayers > playersPerPage && (index < pageStartIndex || index >= pageEndIndex)) {
+										if (
+											totalPlayers > playersPerPage &&
+											(index < pageStartIndex || index >= pageEndIndex)
+										) {
 											return null
 										}
 
 										// Calculate the player's position within the current page
-										const playerIndexInPage = totalPlayers > playersPerPage ? index - pageStartIndex : index
-										const visiblePlayers = totalPlayers > playersPerPage ? 
-											Math.min(playersPerPage, totalPlayers - pageStartIndex) : totalPlayers
+										const playerIndexInPage =
+											totalPlayers > playersPerPage
+												? index - pageStartIndex
+												: index
+										const visiblePlayers =
+											totalPlayers > playersPerPage
+												? Math.min(
+														playersPerPage,
+														totalPlayers - pageStartIndex
+												  )
+												: totalPlayers
 
 										// Special case for 1 player
 										if (visiblePlayers === 1) {
@@ -391,14 +415,14 @@ export default function RoomPage() {
 											// Offset the starting angle to place first player at the top
 											const startAngle = 270
 											const angle = startAngle + playerIndexInPage * angleStep
-											
+
 											// Convert angle to radians for Math.sin and Math.cos
 											const angleRad = (angle * Math.PI) / 180
-											
+
 											// Calculate position using trigonometry
 											// Center is at (50%, 50%)
-											left = 50 + radius * Math.cos(angleRad) / 2
-											
+											left = 50 + (radius * Math.cos(angleRad)) / 2
+
 											// Adjust top position - add extra distance for cards at the top and bottom
 											let topAdjustment = 0
 											if (angle > 225 && angle < 315) {
@@ -408,8 +432,9 @@ export default function RoomPage() {
 												// For cards at the bottom, add extra distance
 												topAdjustment = 20 // Reduced extra distance from table for bottom cards
 											}
-											top = 60 + (radius * Math.sin(angleRad) / 2) + topAdjustment
-											
+											top =
+												60 + (radius * Math.sin(angleRad)) / 2 + topAdjustment
+
 											// Determine card orientation based on position
 											if (angle > 225 && angle < 315) {
 												position = 'top'
@@ -473,21 +498,12 @@ export default function RoomPage() {
 								</button>
 							</div>
 						)}
-						{/* Display voting results below the table and above player cards */}
-						<div
-							className={`${room.revealed
-								? 'block w-full mt-8 mb-8 relative z-10'
-								: 'hidden'}`}
-						>
-							<VotingResults
-								voteStats={voteStats}
-								revealed={room.revealed}
-								showResults={showResults}
-								onClose={() => setShowResults(false)}
-								inline={true}
-							/>
-						</div>
 					</div>
+
+					{/* Display voting results below the player circle area */}
+					{room.revealed && (
+						<VotingResults users={room.users} revealed={room.revealed} />
+					)}
 
 					{currentUser && (
 						<VotingControls
@@ -496,7 +512,8 @@ export default function RoomPage() {
 							disabled={
 								!room.isVoting ||
 								room.revealed ||
-								currentUser?.role !== 'estimator'
+								currentUser?.role !== 'estimator' ||
+								!room.enabled
 							}
 							currentVote={currentUser.vote}
 						/>
