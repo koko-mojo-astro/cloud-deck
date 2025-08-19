@@ -263,71 +263,71 @@ export default function RoomPage() {
 					</div>
 				</div>
 			)}
-			<div className='min-h-dvh bg-gradient-to-b from-white to-gray-100 dark:from-black dark:to-gray-800 p-4 md:p-8 overflow-x-hidden overflow-y-auto'>
-				<div className='max-w-6xl mx-auto w-full min-h-full flex flex-col justify-between'>
-					<div className='flex flex-col md:flex-row justify-between items-center mb-4 md:mb-8 gap-4'>
+                        <div className='min-h-dvh bg-gradient-to-b from-white to-gray-100 dark:from-black dark:to-gray-800 font-brand p-lg md:p-2xl overflow-x-hidden overflow-y-auto'>
+                                <div className='max-w-6xl mx-auto w-full min-h-full flex flex-col justify-between'>
+                                        <div className='flex flex-col md:flex-row justify-between items-center mb-lg md:mb-2xl gap-lg'>
 						<div className='flex flex-col items-start w-full md:w-auto'>
-							<h1 className='text-2xl md:text-3xl flex font-bold text-gray-900 dark:text-white mb-2 md:mb-4'>
+                                                        <h1 className='text-2xl md:text-3xl flex font-bold text-gray-900 dark:text-white mb-sm md:mb-lg'>
 								{currentUser?.roomName || 'Planning Poker Room'}
 							</h1>
 						</div>
-						<div className='flex items-center gap-2 md:gap-4 flex-wrap justify-center relative w-full md:w-auto'>
+                                                <div className='flex items-center gap-sm md:gap-lg flex-wrap justify-center relative w-full md:w-auto'>
 							{inviteToast && (
-								<div className='fixed top-28 left-4 right-4 md:left-auto md:right-4 md:w-80 transform bg-[#ffffff] z-10 text-black border border-l-[4px] border-l-teal-500 px-6 py-3 duration-500 shadow-md'>
+                                                                <div className='fixed top-28 left-4 right-4 md:left-auto md:right-4 md:w-80 transform bg-background z-10 text-text-primary border border-l-[4px] border-l-teal-500 px-xl py-md duration-500 shadow-md'>
 									{inviteToast}
 								</div>
 							)}
 							{currentUser?.role === 'admin' && (
-								<div className='flex gap-2 flex-wrap justify-center'>
+                                                                <div className='flex gap-sm flex-wrap justify-center'>
 									{!room.isVoting && room.enabled && !room.revealed && (
-										<button
-											onClick={handleStartVoting}
-											className='px-3 md:px-4 py-2 bg-[#00A550] hover:bg-[#008040] text-white rounded-md text-sm md:text-base'
-										>
+                                                                                <button
+                                                                                        onClick={handleStartVoting}
+                                                                                        className='px-md md:px-lg py-sm bg-brand-green hover:bg-brand-green-dark text-white rounded-md text-sm md:text-base'
+                                                                                >
 											Start Voting
 										</button>
 									)}
 									{room.isVoting && !room.revealed && room.enabled && (
-										<button
-											onClick={handleRevealVotes}
-											disabled={
-												!room.users.every(
-													(user) => user.role !== 'estimator' || user.hasVoted
-												)
-											}
-											className='px-3 md:px-4 py-2 bg-[#00A550] hover:bg-[#008040] text-white rounded-md shadow-sm transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm md:text-base'
-										>
+                                                                                <button
+                                                                                        onClick={handleRevealVotes}
+                                                                                        disabled={
+                                                                                                !room.users.every(
+                                                                                                        (user) => user.role !== 'estimator' || user.hasVoted
+                                                                                                )
+                                                                                        }
+                                                                                        className='px-md md:px-lg py-sm bg-brand-green hover:bg-brand-green-dark text-white rounded-md shadow-sm transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm md:text-base'
+                                                                                >
 											Reveal Votes
 										</button>
 									)}
 									{room.revealed && (
-										<div className='flex gap-2 flex-wrap justify-center'>
-											<button
-												onClick={handleResetVotes}
-												className='px-3 md:px-4 py-2 bg-[#EC1C24] hover:bg-[#D01017] text-white rounded-md shadow-sm transition-colors duration-200 text-sm md:text-base'
-											>
-												Reset
-											</button>
-										</div>
-									)}
-									<button
-										onClick={handleCopyInviteLink}
-										className='px-3 md:px-4 py-2 bg-[#00A550] hover:bg-[#008040] text-white rounded-md shadow-sm transition-colors duration-200 text-sm md:text-base'
-									>
-										{inviteToast ? 'Copied!' : 'Invite Team'}
-									</button>
-									<button
-										onClick={() => setShowAdminControls(true)}
-										className='px-3 md:px-4 py-2 bg-[#00A550] hover:bg-[#008040] text-white rounded-md shadow-sm transition-colors duration-200 text-sm md:text-base'
-									>
-										Admin Settings
-									</button>
-								</div>
-							)}
-						</div>
-					</div>
+                                                                <div className='flex gap-sm flex-wrap justify-center'>
+                                                                                        <button
+                                                                                                onClick={handleResetVotes}
+                                                                                                className='px-md md:px-lg py-sm bg-brand-red hover:bg-brand-red-dark text-white rounded-md shadow-sm transition-colors duration-200 text-sm md:text-base'
+                                                                                        >
+                                                                                                Reset
+                                                                                        </button>
+                                                                                </div>
+                                                                        )}
+                                                                        <button
+                                                                                onClick={handleCopyInviteLink}
+                                                                                className='px-md md:px-lg py-sm bg-brand-green hover:bg-brand-green-dark text-white rounded-md shadow-sm transition-colors duration-200 text-sm md:text-base'
+                                                                        >
+                                                                                {inviteToast ? 'Copied!' : 'Invite Team'}
+                                                                        </button>
+                                                                        <button
+                                                                                onClick={() => setShowAdminControls(true)}
+                                                                                className='px-md md:px-lg py-sm bg-brand-green hover:bg-brand-green-dark text-white rounded-md shadow-sm transition-colors duration-200 text-sm md:text-base'
+                                                                        >
+                                                                                Admin Settings
+                                                                        </button>
+                                                                </div>
+                                                        )}
+                                                </div>
+                                        </div>
 
-					<div className='flex-1 flex flex-col min-h-[500px] gap-4 md:gap-8 overflow-y-auto justify-center'>
+                                        <div className='flex-1 flex flex-col min-h-[500px] gap-lg md:gap-2xl overflow-y-auto justify-center'>
 						{/* Admin Controls Panel - Only visible to admin users */}
 						{currentUser?.role === 'admin' && (
 							<AdminControls
@@ -338,16 +338,16 @@ export default function RoomPage() {
 								onClose={() => setShowAdminControls(false)}
 							/>
 						)}
-						<div className='w-full flex items-center justify-center mt-8'>
-							<div className='relative h-[170px] sm:h-[150px] w-[230px] sm:w-[250px] md:w-[300px]'>
-								<div className='w-full h-full bg-[#2A2A2A] rounded-lg flex flex-col items-center justify-center shadow-2xl'>
-									<div className='w-[95%] h-[85%] bg-[#333333] rounded-lg flex flex-col items-center justify-center shadow-inner relative'>
+                                                <div className='w-full flex items-center justify-center mt-2xl'>
+                                                        <div className='relative h-[170px] sm:h-[150px] w-[230px] sm:w-[250px] md:w-[300px]'>
+                                                                <div className='w-full h-full bg-[#2A2A2A] rounded-lg flex flex-col items-center justify-center shadow-2xl'>
+                                                                        <div className='w-[95%] h-[85%] bg-[#333333] rounded-lg flex flex-col items-center justify-center shadow-inner relative'>
 										<Image
 											src={vercelLogo}
 											alt='Menicon Logo'
 											width={40}
 											height={40}
-											className='mb-4'
+                                                                                        className='mb-lg'
 										/>
 										<h2 className='text-white text-lg font-medium'>
 											{'Cloud Deck'}
@@ -476,12 +476,12 @@ export default function RoomPage() {
 							</div>
 						</div>
 						{/* Pagination controls for when there are more than 10 users */}
-						{room && room.users.length > 10 && (
-							<div className='flex justify-center items-center mt-4 mb-4 space-x-4'>
+                                                {room && room.users.length > 10 && (
+                                                        <div className='flex justify-center items-center mt-lg mb-lg space-x-lg'>
 								<button
 									onClick={goToPrevPage}
 									disabled={currentPage === 0}
-									className='px-3 py-1 bg-[#00A550] text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed'
+                                                                    className='px-md py-xs bg-brand-green text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed'
 								>
 									&larr; Previous
 								</button>
@@ -492,7 +492,7 @@ export default function RoomPage() {
 								<button
 									onClick={goToNextPage}
 									disabled={currentPage >= totalPages - 1}
-									className='px-3 py-1 bg-[#00A550] text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed'
+                                                                    className='px-md py-xs bg-brand-green text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed'
 								>
 									Next &rarr;
 								</button>

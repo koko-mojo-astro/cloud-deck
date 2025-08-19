@@ -40,8 +40,8 @@ export default function AdminControls({
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="relative w-full max-w-md mx-auto bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 animate-[bounceIn_0.5s_ease-in-out]">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-lg">
+      <div className="relative w-full max-w-md mx-auto bg-white dark:bg-gray-800 rounded-lg shadow-lg p-xl animate-[bounceIn_0.5s_ease-in-out]">
         <button
           onClick={onClose}
           className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
@@ -62,11 +62,11 @@ export default function AdminControls({
           </svg>
         </button>
         
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-lg">
           Admin Controls
         </h3>
         
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-lg">
           {/* Room Enable/Disable Toggle */}
           <div className="flex items-center justify-between">
             <span className="text-sm text-gray-700 dark:text-gray-300">
@@ -74,7 +74,7 @@ export default function AdminControls({
             </span>
             <button
               onClick={handleToggleRoomEnabled}
-              className={`px-3 py-1 rounded-md text-white text-sm ${room.enabled ? 'bg-[#00A550]' : 'bg-[#EC1C24]'}`}
+              className={`px-md py-xs rounded-md text-white text-sm ${room.enabled ? 'bg-brand-green' : 'bg-brand-red'}`}
             >
               {room.enabled ? 'Enabled' : 'Disabled'}
             </button>
@@ -87,7 +87,7 @@ export default function AdminControls({
             </span>
             <button
               onClick={() => setShowTimerSettings(!showTimerSettings)}
-              className="px-3 py-1 bg-[#00A550] text-white rounded-md text-sm"
+              className="px-md py-xs bg-brand-green text-white rounded-md text-sm"
             >
               {showTimerSettings ? 'Cancel' : 'Change'}
             </button>
@@ -95,20 +95,20 @@ export default function AdminControls({
 
           {/* Timer Settings Form */}
           {showTimerSettings && (
-            <div className="mt-2 p-3 bg-gray-100 dark:bg-gray-700 rounded-md">
-              <div className="flex items-center gap-2">
+            <div className="mt-sm p-md bg-gray-100 dark:bg-gray-700 rounded-md">
+              <div className="flex items-center gap-sm">
                 <input
                   type="number"
                   min="5"
                   max="300"
                   value={timerDuration}
                   onChange={handleTimerChange}
-                  className="w-20 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md text-sm"
+                  className="w-20 px-sm py-xs border border-gray-300 dark:border-gray-600 rounded-md text-sm"
                 />
                 <span className="text-sm text-gray-700 dark:text-gray-300">seconds</span>
                 <button
                   onClick={handleSetTimer}
-                  className="ml-auto px-3 py-1 bg-[#00A550] text-white rounded-md text-sm"
+                  className="ml-auto px-md py-xs bg-brand-green text-white rounded-md text-sm"
                 >
                   Save
                 </button>
