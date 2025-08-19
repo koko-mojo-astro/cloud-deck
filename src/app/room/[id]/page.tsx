@@ -27,8 +27,8 @@ export default function RoomPage() {
 	const [inviteToast, setInviteToast] = useState('')
 	const [currentUser, setCurrentUser] = useState<User | null>(null)
 	const [timeLeft, setTimeLeft] = useState<number | null>(null)
-	const [countdown, setCountdown] = useState<number | null>(null)
-	const [currentPage, setCurrentPage] = useState(0)
+        const [countdown, setCountdown] = useState<number | null>(null)
+        const [visibleCount, setVisibleCount] = useState(10)
 
 	useEffect(() => {
 		const name = searchParams?.get('name')
@@ -225,24 +225,11 @@ export default function RoomPage() {
 		setTimeout(() => setInviteToast(''), 3000)
 	}
 
-	// Calculate total pages based on number of users
-	const playersPerPage = 10
-	const totalPages = Math.ceil((room?.users?.length || 0) / playersPerPage)
-		? Math.ceil(room.users.length / playersPerPage)
-		: 1
+        const loadMorePlayers = () => {
+                setVisibleCount((prev) => prev + 10)
+        }
 
-	// Functions to navigate between pages
-	const goToNextPage = () => {
-		if (currentPage < totalPages - 1) {
-			setCurrentPage(currentPage + 1)
-		}
-	}
-
-	const goToPrevPage = () => {
-		if (currentPage > 0) {
-			setCurrentPage(currentPage - 1)
-		}
-	}
+        const displayedPlayers = room.users.slice(0, visibleCount)
 
 	// Calculate progress percentage for the timer
 	const timerProgress =
@@ -338,166 +325,53 @@ export default function RoomPage() {
 								onClose={() => setShowAdminControls(false)}
 							/>
 						)}
-						<div className='w-full flex items-center justify-center mt-8'>
-							<div className='relative h-[170px] sm:h-[150px] w-[230px] sm:w-[250px] md:w-[300px]'>
-								<div className='w-full h-full bg-[#2A2A2A] rounded-lg flex flex-col items-center justify-center shadow-2xl'>
-									<div className='w-[95%] h-[85%] bg-[#333333] rounded-lg flex flex-col items-center justify-center shadow-inner relative'>
-										<Image
-											src={vercelLogo}
-											alt='Menicon Logo'
-											width={40}
-											height={40}
-											className='mb-4'
-										/>
-										<h2 className='text-white text-lg font-medium'>
-											{'Cloud Deck'}
-										</h2>
-									</div>
-								</div>
-								{/* Players around the table in a circle */}
-								<div className='absolute inset-0'>
-									{room.users.map((user, index) => {
-										// Calculate positions for circular arrangement
-										let left, top
-										let position: 'top' | 'bottom' | 'left' | 'right' = 'top'
-										const totalPlayers = room.users.length
-
-										// Responsive adjustments for player positioning
-										const isSmallScreen =
-											typeof window !== 'undefined' && window.innerWidth < 640
-										const isMediumScreen =
-											typeof window !== 'undefined' &&
-											window.innerWidth >= 640 &&
-											window.innerWidth < 768
-
-										// Adjust radius based on screen size and number of players
-										const baseRadius = isSmallScreen ? 100 : 200
-										// Increase radius slightly for more players to prevent overlap
-										const radius =
-											baseRadius *
-											(1 + Math.min(0.2, (totalPlayers - 4) * 0.02))
-
-										// For pagination with more than 10 players
-										const playersPerPage = 10
-										const pageStartIndex = currentPage * playersPerPage
-										const pageEndIndex = pageStartIndex + playersPerPage
-
-										// Skip rendering players not in the current page
-										if (
-											totalPlayers > playersPerPage &&
-											(index < pageStartIndex || index >= pageEndIndex)
-										) {
-											return null
-										}
-
-										// Calculate the player's position within the current page
-										const playerIndexInPage =
-											totalPlayers > playersPerPage
-												? index - pageStartIndex
-												: index
-										const visiblePlayers =
-											totalPlayers > playersPerPage
-												? Math.min(
-														playersPerPage,
-														totalPlayers - pageStartIndex
-												  )
-												: totalPlayers
-
-										// Special case for 1 player
-										if (visiblePlayers === 1) {
-											left = 50
-											top = -40 // Reduced distance from table
-											position = 'top'
-										} else {
-											// Calculate angle for each player in a circle
-											// Start from the top (270 degrees) and distribute evenly
-											const angleStep = 360 / visiblePlayers
-											// Offset the starting angle to place first player at the top
-											const startAngle = 270
-											const angle = startAngle + playerIndexInPage * angleStep
-
-											// Convert angle to radians for Math.sin and Math.cos
-											const angleRad = (angle * Math.PI) / 180
-
-											// Calculate position using trigonometry
-											// Center is at (50%, 50%)
-											left = 50 + (radius * Math.cos(angleRad)) / 2
-
-											// Adjust top position - add extra distance for cards at the top and bottom
-											let topAdjustment = 0
-											if (angle > 225 && angle < 315) {
-												// For cards at the top, add extra distance
-												topAdjustment = -15 // Reduced extra distance from table for top cards
-											} else if (angle > 45 && angle < 135) {
-												// For cards at the bottom, add extra distance
-												topAdjustment = 20 // Reduced extra distance from table for bottom cards
-											}
-											top =
-												60 + (radius * Math.sin(angleRad)) / 2 + topAdjustment
-
-											// Determine card orientation based on position
-											if (angle > 225 && angle < 315) {
-												position = 'top'
-											} else if (angle >= 315 || angle < 45) {
-												position = 'right'
-											} else if (angle >= 45 && angle < 135) {
-												position = 'bottom'
-											} else {
-												position = 'left'
-											}
-										}
-
-										return (
-											<div
-												key={user.id}
-												className='absolute transform -translate-x-1/2 -translate-y-1/2 transition-all duration-500 ease-in-out'
-												style={{
-													left: `${left}%`,
-													top: `${top}%`,
-												}}
-											>
-												<PlayerCard
-													player={user}
-													revealed={room.revealed}
-													isCurrentUser={currentUser?.id === user.id}
-													position={position}
-													timerProgress={
-														room.isVoting &&
-														timeLeft !== null &&
-														user.role === 'estimator'
-															? (timeLeft / DEFAULT_TIMER_DURATION) * 100
-															: undefined
-													}
-												/>
-											</div>
-										)
-									})}
-								</div>
-							</div>
-						</div>
-						{/* Pagination controls for when there are more than 10 users */}
-						{room && room.users.length > 10 && (
-							<div className='flex justify-center items-center mt-4 mb-4 space-x-4'>
-								<button
-									onClick={goToPrevPage}
-									disabled={currentPage === 0}
-									className='px-3 py-1 bg-[#00A550] text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed'
-								>
-									&larr; Previous
-								</button>
-								<span className='text-sm text-gray-600 dark:text-gray-300'>
-									Page {currentPage + 1} of {totalPages} ({room.users.length}{' '}
-									players)
-								</span>
-								<button
-									onClick={goToNextPage}
-									disabled={currentPage >= totalPages - 1}
-									className='px-3 py-1 bg-[#00A550] text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed'
-								>
-									Next &rarr;
-								</button>
-							</div>
-						)}
+                                                <div className='w-full flex flex-col items-center justify-center mt-8'>
+                                                        <div className='relative h-[170px] sm:h-[150px] w-[230px] sm:w-[250px] md:w-[300px]'>
+                                                                <div className='w-full h-full bg-[#2A2A2A] rounded-lg flex flex-col items-center justify-center shadow-2xl'>
+                                                                        <div className='w-[95%] h-[85%] bg-[#333333] rounded-lg flex flex-col items-center justify-center shadow-inner relative'>
+                                                                                <Image
+                                                                                        src={vercelLogo}
+                                                                                        alt='Menicon Logo'
+                                                                                        width={40}
+                                                                                        height={40}
+                                                                                        className='mb-4'
+                                                                                />
+                                                                                <h2 className='text-white text-lg font-medium'>
+                                                                                        {'Cloud Deck'}
+                                                                                </h2>
+                                                                        </div>
+                                                                </div>
+                                                        </div>
+                                                        {/* Player grid */}
+                                                        <div className='mt-8 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 justify-items-center'>
+                                                                {displayedPlayers.map((user) => (
+                                                                        <PlayerCard
+                                                                                key={user.id}
+                                                                                player={user}
+                                                                                revealed={room.revealed}
+                                                                                isCurrentUser={currentUser?.id === user.id}
+                                                                                timerProgress={
+                                                                                        room.isVoting &&
+                                                                                        timeLeft !== null &&
+                                                                                        user.role === 'estimator'
+                                                                                                ? (timeLeft / DEFAULT_TIMER_DURATION) * 100
+                                                                                                : undefined
+                                                                                }
+                                                                        />
+                                                                ))}
+                                                        </div>
+                                                </div>
+                                                {/* Load more control for when there are more than 10 users */}
+                                                {room && room.users.length > visibleCount && (
+                                                        <div className='flex justify-center items-center mt-4 mb-4'>
+                                                                <button
+                                                                        onClick={loadMorePlayers}
+                                                                        className='px-3 py-1 bg-[#00A550] text-white rounded-md'
+                                                                >
+                                                                        Load more
+                                                                </button>
+                                                        </div>
+                                                )}
 					</div>
 
 					{/* Display voting results below the player circle area */}
