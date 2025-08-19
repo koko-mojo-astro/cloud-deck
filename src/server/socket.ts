@@ -62,7 +62,12 @@ export const initSocketServer = (httpServer: HttpServer) => {
 
       let room = rooms.get(roomId);
       if (!room) {
-        // Only use user's voting options when creating a new room and user is admin
+        // Use the admin's custom voting options when provided; otherwise fall back to the Fibonacci sequence
+        const votingOptions =
+          user.role === 'admin' && user.votingOptions?.length
+            ? user.votingOptions
+            : FIBONACCI_SEQUENCE;
+
         room = {
           id: roomId,
           name: user.roomName || 'Planning Poker Room',
@@ -72,7 +77,7 @@ export const initSocketServer = (httpServer: HttpServer) => {
           timerStartedAt: null,
           timerDuration: DEFAULT_TIMER_DURATION, // Use imported constant
           revealed: false,
-          votingOptions: FIBONACCI_SEQUENCE,
+          votingOptions,
           enabled: true // Room is enabled by default
         };
       }
