@@ -26,19 +26,19 @@ export default function JoinRoom() {
 	}
 
 	return (
-		<div className='min-h-screen bg-gradient-to-b from-white to-gray-100 dark:from-black dark:to-gray-800'>
-			<div className='max-w-4xl mx-auto px-4 py-16 sm:px-6 lg:px-8'>
+                <div className='min-h-screen bg-gradient-to-b from-white to-gray-100 dark:from-black dark:to-gray-800 font-brand'>
+                        <div className='max-w-4xl mx-auto px-lg py-4xl sm:px-xl lg:px-2xl'>
 				<div className='text-center'>
-					<h1 className='text-4xl font-bold tracking-tight text-black dark:text-white sm:text-6xl'>
+                                        <h1 className='text-4xl font-bold tracking-tight text-text-primary sm:text-6xl'>
 						Join Cloud Deck
 					</h1>
-					<p className='mt-6 text-lg leading-8 text-gray-600 dark:text-gray-300'>
-						{roomName ? (
-							<>
-								Enter your details to join{' '}
-								<span className='text-[#00A550] dark:text-[#00A550] font-medium'>
-									{roomName}
-								</span>{' '}
+                                        <p className='mt-xl text-lg leading-8 text-gray-600 dark:text-gray-300'>
+                                                {roomName ? (
+                                                        <>
+                                                                Enter your details to join{' '}
+                                                                <span className='text-brand-green font-medium'>
+                                                                        {roomName}
+                                                                </span>{' '}
 								on the Cloud.
 							</>
 						) : (
@@ -47,40 +47,40 @@ export default function JoinRoom() {
 					</p>
 				</div>
 
-				<div className='mt-16 flow-root sm:mt-24'>
-					<div className='max-w-md mx-auto rounded-lg bg-white dark:bg-black shadow-lg p-8'>
-						<div className='flex flex-col items-center space-y-6'>
-							<div className='space-y-4 w-full max-w-md'>
-								<input
+                                <div className='mt-4xl flow-root sm:mt-6xl'>
+                                        <div className='max-w-md mx-auto rounded-lg bg-background shadow-lg p-2xl'>
+                                                <div className='flex flex-col items-center space-y-xl'>
+                                                        <div className='space-y-lg w-full max-w-md'>
+                                                                <input
 									type='text'
 									placeholder='Enter your name'
 									value={userName}
 									onChange={(e) => setUserName(e.target.value)}
-									className='w-full px-4 py-2 text-black dark:text-white placeholder-gray-500 bg-white dark:bg-black border border-[#00A550] dark:border-[#00A550] rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#00A550] focus:border-transparent'
-								/>
-								<select
-									value={role}
-									onChange={(e) => setRole(e.target.value as UserRole)}
-									className='w-full px-4 py-2 text-black dark:text-white bg-white dark:bg-black border border-[#00A550] dark:border-[#00A550] rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#00A550] focus:border-transparent'
-								>
+                                                                        className='w-full px-lg py-sm text-text-primary placeholder-gray-500 bg-background border border-brand-green rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-green focus:border-transparent'
+                                                                />
+                                                                <select
+                                                                        value={role}
+                                                                        onChange={(e) => setRole(e.target.value as UserRole)}
+                                                                        className='w-full px-lg py-sm text-text-primary bg-background border border-brand-green rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-green focus:border-transparent'
+                                                                >
 									<option value='estimator'>Estimator</option>
 									<option value='observer'>Observer</option>
 								</select>
 							</div>
 
-							{error && (
-								<div className='w-full max-w-md p-4 mb-4 text-[#EC1C24] bg-[#EC1C24]/10 rounded-lg dark:bg-[#EC1C24]/20 dark:text-[#EC1C24]'>
-									{error}
-								</div>
-							)}
+                                                        {error && (
+                                                                <div className='w-full max-w-md p-lg mb-lg text-brand-red bg-brand-red/10 rounded-lg dark:bg-brand-red/20 dark:text-brand-red'>
+                                                                        {error}
+                                                                </div>
+                                                        )}
 
-							<button
-								onClick={handleJoinRoom}
-								disabled={!userName.trim()}
-								className='w-full max-w-md px-4 py-3 text-sm font-semibold text-white bg-[#00A550] hover:bg-[#008040] rounded-md shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200'
-							>
-								Join Room
-							</button>
+                                                        <button
+                                                                onClick={handleJoinRoom}
+                                                                disabled={!userName.trim()}
+                                                                className='w-full max-w-md px-lg py-md text-sm font-semibold text-white bg-brand-green hover:bg-brand-green-dark rounded-md shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200'
+                                                        >
+                                                                Join Room
+                                                        </button>
 						</div>
 					</div>
 				</div>

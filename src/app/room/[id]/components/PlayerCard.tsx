@@ -23,18 +23,18 @@ export default function PlayerCard({
 	position = 'top',
 }: PlayerCardProps) {
 	return (
-		<div
-			className={`flex ${position === 'top' ? 'flex-col' : position === 'bottom' ? 'flex-col' : 'flex-col-reverse'} items-center gap-2 sm:gap-3 w-[80px] sm:w-[110px]`} // Increased container width to match the text width
-		>
+                <div
+                        className={`flex ${position === 'top' ? 'flex-col' : position === 'bottom' ? 'flex-col' : 'flex-col-reverse'} items-center gap-sm sm:gap-md w-[80px] sm:w-[110px]`} // Increased container width to match the text width
+                >
 			<div
-				className={`text-xs sm:text-sm font-medium ${
-					isCurrentUser
-						? 'text-[#00A550] font-bold'
-						: 'text-black dark:text-white'
-				} text-center truncate max-w-[80px] sm:max-w-[100px] overflow-hidden`} // Increased max-width for more characters
+                                className={`text-xs sm:text-sm font-medium ${
+                                        isCurrentUser
+                                                ? 'text-brand-green font-bold'
+                                                : 'text-text-primary'
+                                } text-center truncate max-w-[80px] sm:max-w-[100px] overflow-hidden`} // Increased max-width for more characters
 			>
 				{player.role === 'admin' && (
-					<span className='ml-1 text-[#EC1C24]'>👑 </span>
+                                        <span className='ml-xs text-brand-red'>👑 </span>
 				)}
 				{player.name}
 			</div>
@@ -81,9 +81,9 @@ export default function PlayerCard({
 						{/* Front of the card (number) */}
 						<div
 							className={`absolute inset-0 flex flex-col items-center justify-center bg-white dark:bg-black rounded-lg border-2 ${
-								isHighestVoted ? 'border-[#EC1C24]' : 'border-[#00A550]'
+                                                                isHighestVoted ? 'border-brand-red' : 'border-brand-green'
 							} shadow-lg backface-hidden ${
-								isHighestVoted ? 'ring-2 ring-[#EC1C24]' : ''
+                                                                isHighestVoted ? 'ring-2 ring-brand-red' : ''
 							}`}
 							style={{
 								transform: 'rotateY(0deg)',
@@ -92,13 +92,13 @@ export default function PlayerCard({
 						>
 							<span
 								className={`text-lg sm:text-xl font-bold ${
-									isHighestVoted ? 'text-[#EC1C24]' : 'text-[#00A550]'
+                                                                        isHighestVoted ? 'text-brand-red' : 'text-brand-green'
 								}`}
 							>
 								{player.vote}
 							</span>
 							{voteCount && voteCount > 1 && (
-								<span className='text-xs text-gray-500 mt-1'>
+                                                                <span className='text-xs text-gray-500 mt-xs'>
 									{voteCount} votes
 								</span>
 							)}
