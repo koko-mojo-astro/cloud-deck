@@ -13,6 +13,7 @@ interface RoomStore extends RoomState {
   updateTimer: (duration: number) => void;
   toggleRoomEnabled: (enabled: boolean) => void;
   setRoomTimer: (duration: number) => void;
+  setVotingOptions: (options: number[]) => void;
 }
 
 const initialState: RoomState = {
@@ -73,5 +74,6 @@ export const useRoomStore = create<RoomStore>((set) => ({
     })),
   updateTimer: (duration) => set({ timerDuration: duration }),
   toggleRoomEnabled: (enabled) => set({ enabled }),
-  setRoomTimer: (duration) => set({ timerDuration: duration })
+  setRoomTimer: (duration) => set({ timerDuration: duration }),
+  setVotingOptions: (options) => set({ votingOptions: options })
 }));

@@ -1,6 +1,7 @@
 'use client'
 
 import { User } from '@/types/room'
+import ResultsExport from './ResultsExport'
 
 interface VotingResultsProps {
 	users: User[]
@@ -80,12 +81,12 @@ export default function VotingResults({ users, revealed }: VotingResultsProps) {
 				</div>
 
 				{/* Individual Votes List */}
-				<div>
-					<h4 className='text-sm font-medium text-gray-700 dark:text-gray-300 mb-2'>
-						Individual Votes
-					</h4>
-					<div className='max-h-40 overflow-y-auto space-y-1 pr-2'>
-						{' '}
+                                <div>
+                                        <h4 className='text-sm font-medium text-gray-700 dark:text-gray-300 mb-2'>
+                                                Individual Votes
+                                        </h4>
+                                        <div className='max-h-40 overflow-y-auto space-y-1 pr-2'>
+                                                {' '}
 						{/* Scrollable container */}
 						{votingEstimators
 							.sort((a, b) => a.name.localeCompare(b.name)) // Sort alphabetically
@@ -98,9 +99,10 @@ export default function VotingResults({ users, revealed }: VotingResultsProps) {
 									<span className='font-medium'>{user.vote}</span>
 								</div>
 							))}
-					</div>
-				</div>
-			</div>
-		</div>
-	)
+                                        </div>
+                                </div>
+                                <ResultsExport users={votingEstimators} />
+                        </div>
+                </div>
+        )
 }
