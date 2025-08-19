@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import { io, Socket } from 'socket.io-client'
 import {
@@ -15,20 +15,23 @@ import VotingResults from './components/VotingResults'
 import AdminControls from './components/AdminControls'
 import Image from 'next/image'
 import vercelLogo from '../../../public/vercel.svg'
+import { useSocketStore } from '@/store/socket'
 
 export default function RoomPage() {
 	const [showAdminControls, setShowAdminControls] = useState(false)
 	const params = useParams()
 	const searchParams = useSearchParams()
-	const [socket, setSocket] = useState<Socket | null>(null)
-	const [room, setRoom] = useState<Room | null>(null)
-	const [error, setError] = useState<string | null>(null)
-	const [inviteUrl, setInviteUrl] = useState('')
-	const [inviteToast, setInviteToast] = useState('')
-	const [currentUser, setCurrentUser] = useState<User | null>(null)
-	const [timeLeft, setTimeLeft] = useState<number | null>(null)
-	const [countdown, setCountdown] = useState<number | null>(null)
-	const [currentPage, setCurrentPage] = useState(0)
+        const [socket, setSocket] = useState<Socket | null>(null)
+        const [room, setRoom] = useState<Room | null>(null)
+        const [error, setError] = useState<string | null>(null)
+        const [connectError, setConnectError] = useState<string | null>(null)
+        const [inviteUrl, setInviteUrl] = useState('')
+        const [inviteToast, setInviteToast] = useState('')
+        const [currentUser, setCurrentUser] = useState<User | null>(null)
+        const [timeLeft, setTimeLeft] = useState<number | null>(null)
+        const [countdown, setCountdown] = useState<number | null>(null)
+        const [currentPage, setCurrentPage] = useState(0)
+        const { setStatus } = useSocketStore()
 
 	useEffect(() => {
 		const name = searchParams?.get('name')
@@ -36,18 +39,19 @@ export default function RoomPage() {
 			setError('Name is required')
 			return
 		}
-		const socket_url =
-			process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3000'
-		const newSocket = io({
-			path: '/socket.io',
-			transports: ['websocket', 'polling'],
-			reconnectionAttempts: 5,
-			reconnectionDelay: 1000,
-			timeout: 10000,
-			autoConnect: true,
-			forceNew: true,
-		})
-		setSocket(newSocket)
+                const socket_url =
+                        process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3000'
+                setStatus('connecting')
+                const newSocket = io({
+                        path: '/socket.io',
+                        transports: ['websocket', 'polling'],
+                        reconnectionAttempts: 5,
+                        reconnectionDelay: 1000,
+                        timeout: 10000,
+                        autoConnect: true,
+                        forceNew: true,
+                })
+                setSocket(newSocket)
 
 		const role = searchParams?.get('role') || 'estimator'
 		const roomName = searchParams?.get('roomName') || 'Planning Poker Room'
@@ -62,9 +66,15 @@ export default function RoomPage() {
 		}
 		setCurrentUser(user)
 
-		newSocket.on('connect', () => {
-			newSocket.emit('joinRoom', params?.id as string, user)
-		})
+                newSocket.on('connect', () => {
+                        setStatus('connected')
+                        setConnectError(null)
+                        newSocket.emit('joinRoom', params?.id as string, user)
+                })
+
+                newSocket.on('disconnect', () => {
+                        setStatus('disconnected')
+                })
 
 		newSocket.on('countdownStarted', () => {
 			setCountdown(3)
@@ -118,17 +128,19 @@ export default function RoomPage() {
 			}
 		})
 
-		newSocket.on('connect_error', () => {
-			setError('Failed to connect to server')
-		})
+                newSocket.on('connect_error', () => {
+                        setConnectError('Failed to connect to server')
+                        setStatus('error')
+                })
 
-		return () => {
-			if (newSocket) {
-				newSocket.emit('leaveRoom', params?.id as string, user.id)
-				newSocket.disconnect()
-			}
-		}
-	}, [params?.id, searchParams])
+                return () => {
+                        if (newSocket) {
+                                newSocket.emit('leaveRoom', params?.id as string, user.id)
+                                newSocket.disconnect()
+                                setStatus('disconnected')
+                        }
+                }
+        }, [params?.id, searchParams, setStatus])
 
 	// Timer countdown effect
 	useEffect(() => {
@@ -155,42 +167,57 @@ export default function RoomPage() {
 		}
 	}, [timeLeft, socket, room])
 
-	const handleVote = (value: number) => {
-		if (socket && currentUser && room && !room.revealed) {
-			socket.emit('submitVote', room.id, currentUser.id, value)
-		}
-	}
+        const handleVote = useCallback(
+                (value: number) => {
+                        if (socket && currentUser && room && !room.revealed) {
+                                socket.emit('submitVote', room.id, currentUser.id, value)
+                        }
+                },
+                [socket, currentUser, room]
+        )
 
-	const handleRevealVotes = () => {
-		if (socket && room) {
-			socket.emit('revealVotes', room.id)
-		}
-	}
+        const handleRevealVotes = useCallback(() => {
+                if (socket && room) {
+                        socket.emit('revealVotes', room.id)
+                }
+        }, [socket, room])
 
-	const handleResetVotes = () => {
-		if (socket && room) {
-			socket.emit('resetVotes', room.id)
-		}
-	}
+        const handleResetVotes = useCallback(() => {
+                if (socket && room) {
+                        socket.emit('resetVotes', room.id)
+                }
+        }, [socket, room])
 
-	const handleStartVoting = () => {
-		if (socket && room) {
-			socket.emit('startVoting', room.id)
-		}
-	}
+        const handleStartVoting = useCallback(() => {
+                if (socket && room) {
+                        socket.emit('startVoting', room.id)
+                }
+        }, [socket, room])
 
-	// Admin handlers for room enabling/disabling and timer settings
-	const handleToggleRoomEnabled = (enabled: boolean) => {
-		if (socket && room) {
-			socket.emit('toggleRoomEnabled', room.id, enabled)
-		}
-	}
+        // Admin handlers for room enabling/disabling and timer settings
+        const handleToggleRoomEnabled = useCallback(
+                (enabled: boolean) => {
+                        if (socket && room) {
+                                socket.emit('toggleRoomEnabled', room.id, enabled)
+                        }
+                },
+                [socket, room]
+        )
 
-	const handleSetRoomTimer = (duration: number) => {
-		if (socket && room) {
-			socket.emit('setRoomTimer', room.id, duration)
-		}
-	}
+        const handleSetRoomTimer = useCallback(
+                (duration: number) => {
+                        if (socket && room) {
+                                socket.emit('setRoomTimer', room.id, duration)
+                        }
+                },
+                [socket, room]
+        )
+
+        const handleRetry = useCallback(() => {
+                setConnectError(null)
+                setStatus('connecting')
+                socket?.connect()
+        }, [socket, setStatus])
 
 	if (error) {
 		return (
@@ -202,59 +229,73 @@ export default function RoomPage() {
 		)
 	}
 
-	if (!room) {
-		return (
-			<div className='min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800'>
-				<div className='text-center'>
-					<h1 className='text-2xl font-bold text-gray-900 dark:text-white'>
-						Connecting to room...
-					</h1>
-				</div>
-			</div>
-		)
-	}
+        if (!room) {
+                return (
+                        <div className='min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 p-4'>
+                                {connectError && (
+                                        <div className='mb-4 w-full max-w-md bg-red-100 text-red-700 px-4 py-2 rounded-md flex justify-between items-center'>
+                                                <span>{connectError}</span>
+                                                <button onClick={handleRetry} className='underline'>Retry</button>
+                                        </div>
+                                )}
+                                <div className='text-center'>
+                                        <h1 className='text-2xl font-bold text-gray-900 dark:text-white'>
+                                                Connecting to room...
+                                        </h1>
+                                </div>
+                        </div>
+                )
+        }
 
-	const handleCopyInviteLink = () => {
-		const url = `${window.location.origin}/join/${params?.id}/?roomName=${
-			currentUser?.roomName ? encodeURIComponent(currentUser?.roomName) : 'room'
-		}`
-		navigator.clipboard.writeText(url)
-		setInviteToast(
-			'Invite URL copied! Share with your team members to join the planning session.'
-		)
-		setTimeout(() => setInviteToast(''), 3000)
-	}
+        const handleCopyInviteLink = useCallback(() => {
+                const url = `${window.location.origin}/join/${params?.id}/?roomName=${
+                        currentUser?.roomName ? encodeURIComponent(currentUser?.roomName) : 'room'
+                }`
+                navigator.clipboard.writeText(url)
+                setInviteToast(
+                        'Invite URL copied! Share with your team members to join the planning session.'
+                )
+                setTimeout(() => setInviteToast(''), 3000)
+        }, [currentUser?.roomName, params?.id])
 
-	// Calculate total pages based on number of users
-	const playersPerPage = 10
-	const totalPages = Math.ceil((room?.users?.length || 0) / playersPerPage)
-		? Math.ceil(room.users.length / playersPerPage)
-		: 1
+        // Calculate total pages based on number of users
+        const playersPerPage = 10
+        const totalPages = useMemo(() => {
+                return room?.users?.length ? Math.ceil(room.users.length / playersPerPage) : 1
+        }, [room?.users?.length])
 
-	// Functions to navigate between pages
-	const goToNextPage = () => {
-		if (currentPage < totalPages - 1) {
-			setCurrentPage(currentPage + 1)
-		}
-	}
+        // Functions to navigate between pages
+        const goToNextPage = useCallback(() => {
+                if (currentPage < totalPages - 1) {
+                        setCurrentPage(currentPage + 1)
+                }
+        }, [currentPage, totalPages])
 
-	const goToPrevPage = () => {
-		if (currentPage > 0) {
-			setCurrentPage(currentPage - 1)
-		}
-	}
+        const goToPrevPage = useCallback(() => {
+                if (currentPage > 0) {
+                        setCurrentPage(currentPage - 1)
+                }
+        }, [currentPage])
 
-	// Calculate progress percentage for the timer
-	const timerProgress =
-		timeLeft !== null ? (timeLeft / DEFAULT_TIMER_DURATION) * 100 : 0
+        // Calculate progress percentage for the timer
+        const timerProgress = useMemo(
+                () => (timeLeft !== null ? (timeLeft / DEFAULT_TIMER_DURATION) * 100 : 0),
+                [timeLeft]
+        )
 	// Vote state is managed through socket events
-	return (
-		<>
-			{countdown !== null && (
-				<div className='fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center'>
-					<div
-						key={countdown}
-						className='text-8xl font-bold text-white animate-[bounceIn_0.5s_ease-in-out]'
+        return (
+                <>
+                        {connectError && (
+                                <div className='fixed top-0 left-0 right-0 bg-red-100 text-red-700 px-4 py-2 flex justify-between items-center z-50'>
+                                        <span>{connectError}</span>
+                                        <button onClick={handleRetry} className='underline'>Retry</button>
+                                </div>
+                        )}
+                        {countdown !== null && (
+                                <div className='fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center'>
+                                        <div
+                                                key={countdown}
+                                                className='text-8xl font-bold text-white animate-[bounceIn_0.5s_ease-in-out]'
 						style={{
 							animationFillMode: 'both',
 						}}
