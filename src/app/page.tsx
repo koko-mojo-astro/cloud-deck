@@ -47,26 +47,34 @@ export default function Home() {
 				<div className='mt-16 flow-root sm:mt-24'>
 					<div className='max-w-md mx-auto rounded-lg bg-white dark:bg-black shadow-lg p-8'>
 						<div className='flex flex-col items-center space-y-6'>
-							<div className='w-full max-w-md space-y-4'>
-								<input
-									type='text'
-									placeholder='Enter your name'
-									value={name}
-									onChange={(e) => setName(e.target.value)}
-									className='w-full px-4 py-2 text-black dark:text-white placeholder-gray-500 bg-white dark:bg-black border border-[#00A550] dark:border-[#00A550] rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#00A550] focus:border-transparent'
-								/>
-								<input
-									type='text'
-									placeholder='Enter room name (optional)'
-									value={roomName}
-									onChange={(e) => setRoomName(e.target.value)}
-									className='w-full px-4 py-2 text-black dark:text-white placeholder-gray-500 bg-white dark:bg-black border border-[#00A550] dark:border-[#00A550] rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#00A550] focus:border-transparent'
-								/>
-								{/* <select
-									value={votingSystem}
-									onChange={(e) =>
-										setVotingSystem(e.target.value as VotingSystem)
-									}
+                                                        <div className='w-full max-w-md space-y-4'>
+                                                                <label htmlFor='name' className='sr-only'>
+                                                                        Name
+                                                                </label>
+                                                                <input
+                                                                        id='name'
+                                                                        type='text'
+                                                                        placeholder='Enter your name'
+                                                                        value={name}
+                                                                        onChange={(e) => setName(e.target.value)}
+                                                                        className='w-full px-4 py-2 text-black dark:text-white placeholder-gray-500 bg-white dark:bg-black border border-[#00A550] dark:border-[#00A550] rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#00A550] focus:border-transparent'
+                                                                />
+                                                                <label htmlFor='roomName' className='sr-only'>
+                                                                        Room name
+                                                                </label>
+                                                                <input
+                                                                        id='roomName'
+                                                                        type='text'
+                                                                        placeholder='Enter room name (optional)'
+                                                                        value={roomName}
+                                                                        onChange={(e) => setRoomName(e.target.value)}
+                                                                        className='w-full px-4 py-2 text-black dark:text-white placeholder-gray-500 bg-white dark:bg-black border border-[#00A550] dark:border-[#00A550] rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#00A550] focus:border-transparent'
+                                                                />
+                                                                {/* <select
+                                                                        value={votingSystem}
+                                                                        onChange={(e) =>
+                                                                                setVotingSystem(e.target.value as VotingSystem)
+                                                                        }
 									className='w-full px-4 py-2 text-black dark:text-white bg-white dark:bg-black border border-[#00A550] dark:border-[#00A550] rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#00A550] focus:border-transparent'
 								>
 									<option value='fibonacci'>Fibonacci</option>

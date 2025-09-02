@@ -50,29 +50,41 @@ export default function JoinRoom() {
 				<div className='mt-16 flow-root sm:mt-24'>
 					<div className='max-w-md mx-auto rounded-lg bg-white dark:bg-black shadow-lg p-8'>
 						<div className='flex flex-col items-center space-y-6'>
-							<div className='space-y-4 w-full max-w-md'>
-								<input
-									type='text'
-									placeholder='Enter your name'
-									value={userName}
-									onChange={(e) => setUserName(e.target.value)}
-									className='w-full px-4 py-2 text-black dark:text-white placeholder-gray-500 bg-white dark:bg-black border border-[#00A550] dark:border-[#00A550] rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#00A550] focus:border-transparent'
-								/>
-								<select
-									value={role}
-									onChange={(e) => setRole(e.target.value as UserRole)}
-									className='w-full px-4 py-2 text-black dark:text-white bg-white dark:bg-black border border-[#00A550] dark:border-[#00A550] rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#00A550] focus:border-transparent'
-								>
-									<option value='estimator'>Estimator</option>
-									<option value='observer'>Observer</option>
-								</select>
-							</div>
+                                                        <div className='space-y-4 w-full max-w-md'>
+                                                                <label htmlFor='userName' className='sr-only'>
+                                                                        Name
+                                                                </label>
+                                                                <input
+                                                                        id='userName'
+                                                                        type='text'
+                                                                        placeholder='Enter your name'
+                                                                        value={userName}
+                                                                        onChange={(e) => setUserName(e.target.value)}
+                                                                        aria-describedby={error ? 'name-error' : undefined}
+                                                                        className='w-full px-4 py-2 text-black dark:text-white placeholder-gray-500 bg-white dark:bg-black border border-[#00A550] dark:border-[#00A550] rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#00A550] focus:border-transparent'
+                                                                />
+                                                                <label htmlFor='role' className='sr-only'>
+                                                                        Role
+                                                                </label>
+                                                                <select
+                                                                        id='role'
+                                                                        value={role}
+                                                                        onChange={(e) => setRole(e.target.value as UserRole)}
+                                                                        className='w-full px-4 py-2 text-black dark:text-white bg-white dark:bg-black border border-[#00A550] dark:border-[#00A550] rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#00A550] focus:border-transparent'
+                                                                >
+                                                                        <option value='estimator'>Estimator</option>
+                                                                        <option value='observer'>Observer</option>
+                                                                </select>
+                                                        </div>
 
-							{error && (
-								<div className='w-full max-w-md p-4 mb-4 text-[#EC1C24] bg-[#EC1C24]/10 rounded-lg dark:bg-[#EC1C24]/20 dark:text-[#EC1C24]'>
-									{error}
-								</div>
-							)}
+                                                        {error && (
+                                                                <div
+                                                                        id='name-error'
+                                                                        className='w-full max-w-md p-4 mb-4 text-[#EC1C24] bg-[#EC1C24]/10 rounded-lg dark:bg-[#EC1C24]/20 dark:text-[#EC1C24]'
+                                                                >
+                                                                        {error}
+                                                                </div>
+                                                        )}
 
 							<button
 								onClick={handleJoinRoom}
