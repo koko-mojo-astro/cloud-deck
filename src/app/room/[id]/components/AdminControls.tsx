@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Room } from '@/types/room'
 
 interface AdminControlsProps {
@@ -20,6 +20,7 @@ export default function AdminControls({
 }: AdminControlsProps) {
   const [showTimerSettings, setShowTimerSettings] = useState(false)
   const [timerDuration, setTimerDuration] = useState(room.timerDuration)
+  const modalRef = useRef<HTMLDivElement>(null)
 
   const handleToggleRoomEnabled = () => {
     onToggleRoomEnabled(!room.enabled)
@@ -37,13 +38,49 @@ export default function AdminControls({
     setShowTimerSettings(false)
   }
 
+  useEffect(() => {
+    if (!isOpen) return
+    const focusable = modalRef.current?.querySelectorAll<HTMLElement>(
+      'a[href], button, textarea, input, select, [tabindex]:not([tabindex="-1"])'
+    )
+    const first = focusable?.[0]
+    const last = focusable?.[focusable.length - 1]
+    first?.focus()
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Tab') {
+        if (!first || !last) return
+        if (e.shiftKey) {
+          if (document.activeElement === first) {
+            e.preventDefault()
+            last.focus()
+          }
+        } else {
+          if (document.activeElement === last) {
+            e.preventDefault()
+            first.focus()
+          }
+        }
+      } else if (e.key === 'Escape') {
+        onClose()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [isOpen, onClose])
+
   if (!isOpen) return null
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="relative w-full max-w-md mx-auto bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 animate-[bounceIn_0.5s_ease-in-out]">
+      <div
+        ref={modalRef}
+        className="relative w-full max-w-md mx-auto bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 animate-[bounceIn_0.5s_ease-in-out]"
+      >
         <button
           onClick={onClose}
+          aria-label="Close modal"
           className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
         >
           <svg
