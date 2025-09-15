@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import { io, Socket } from 'socket.io-client'
 import {
@@ -16,6 +16,55 @@ import AdminControls from './components/AdminControls'
 import Image from 'next/image'
 import vercelLogo from '../../../public/vercel.svg'
 
+const PLAYERS_PER_PAGE = 10
+
+const getSeatRadius = (count: number) => {
+        if (count <= 0) {
+                return '0px'
+        }
+        if (count === 1) {
+                return 'clamp(8rem, 32vw, 13rem)'
+        }
+        if (count === 2) {
+                return 'clamp(7rem, 28vw, 12rem)'
+        }
+        if (count <= 4) {
+                return 'clamp(8rem, 30vw, 14rem)'
+        }
+        if (count <= 6) {
+                return 'clamp(9rem, 32vw, 15rem)'
+        }
+        if (count <= 8) {
+                return 'clamp(10rem, 34vw, 16rem)'
+        }
+        return 'clamp(11rem, 36vw, 17rem)'
+}
+
+const getSeatTransform = (index: number, total: number, radius: string) => {
+        if (total <= 0) {
+                return 'translate(-50%, -50%)'
+        }
+        if (total === 1) {
+                return `translate(-50%, -50%) rotate(180deg) translateY(calc(-1 * ${radius})) rotate(-180deg)`
+        }
+        const angleOffset = -90
+        const angle = (360 / total) * index + angleOffset
+        return `translate(-50%, -50%) rotate(${angle}deg) translateY(calc(-1 * ${radius})) rotate(${-angle}deg)`
+}
+
+const getSeatPosition = (index: number, total: number) => {
+        if (total <= 0) {
+                return 'top'
+        }
+        if (total === 1) {
+                return 'bottom'
+        }
+        const angleOffset = -90
+        const angle = (360 / total) * index + angleOffset
+        const normalized = ((angle % 360) + 360) % 360
+        return normalized > 90 && normalized < 270 ? 'bottom' : 'top'
+}
+
 export default function RoomPage() {
 	const [showAdminControls, setShowAdminControls] = useState(false)
 	const params = useParams()
@@ -28,7 +77,8 @@ export default function RoomPage() {
 	const [currentUser, setCurrentUser] = useState<User | null>(null)
 	const [timeLeft, setTimeLeft] = useState<number | null>(null)
         const [countdown, setCountdown] = useState<number | null>(null)
-        const [visibleCount, setVisibleCount] = useState(10)
+        const [pageIndex, setPageIndex] = useState(0)
+        const initialPageAssigned = useRef(false)
 
 	useEffect(() => {
 		const name = searchParams?.get('name')
@@ -148,12 +198,40 @@ export default function RoomPage() {
 	}, [timeLeft, room?.revealed])
 
 	// Auto-reveal votes when timer reaches 0
-	useEffect(() => {
-		if (timeLeft === 0 && socket && room && !room.revealed) {
-			socket.emit('revealVotes', room.id)
-			setTimeLeft(null) // Reset timer when votes are revealed
-		}
-	}, [timeLeft, socket, room])
+        useEffect(() => {
+                if (timeLeft === 0 && socket && room && !room.revealed) {
+                        socket.emit('revealVotes', room.id)
+                        setTimeLeft(null) // Reset timer when votes are revealed
+                }
+        }, [timeLeft, socket, room])
+
+        useEffect(() => {
+                if (!room) {
+                        return
+                }
+                const pages = Math.max(1, Math.ceil(room.users.length / PLAYERS_PER_PAGE))
+                setPageIndex((prev) => {
+                        const next = Math.min(prev, pages - 1)
+                        return prev === next ? prev : next
+                })
+        }, [room?.users.length])
+
+        useEffect(() => {
+                if (!room || !currentUser || initialPageAssigned.current) {
+                        return
+                }
+                const currentUserIndex = room.users.findIndex((user) => user.id === currentUser.id)
+                if (currentUserIndex === -1) {
+                        return
+                }
+                const pageForUser = Math.floor(currentUserIndex / PLAYERS_PER_PAGE)
+                setPageIndex(pageForUser)
+                initialPageAssigned.current = true
+        }, [room, currentUser])
+
+        useEffect(() => {
+                initialPageAssigned.current = false
+        }, [currentUser?.id])
 
 	const handleVote = (value: number) => {
 		if (socket && currentUser && room && !room.revealed) {
@@ -225,11 +303,26 @@ export default function RoomPage() {
 		setTimeout(() => setInviteToast(''), 3000)
 	}
 
-        const loadMorePlayers = () => {
-                setVisibleCount((prev) => prev + 10)
+        const totalPages = Math.max(1, Math.ceil(room.users.length / PLAYERS_PER_PAGE))
+        const clampedPageIndex = Math.min(pageIndex, totalPages - 1)
+        const startIndex = clampedPageIndex * PLAYERS_PER_PAGE
+        const displayedPlayers = room.users.slice(
+                startIndex,
+                startIndex + PLAYERS_PER_PAGE
+        )
+        const seatRadius = getSeatRadius(displayedPlayers.length)
+
+        const showCarouselControls = totalPages > 1
+
+        const handleNextPage = () => {
+                initialPageAssigned.current = true
+                setPageIndex((prev) => (prev + 1) % totalPages)
         }
 
-        const displayedPlayers = room.users.slice(0, visibleCount)
+        const handlePreviousPage = () => {
+                initialPageAssigned.current = true
+                setPageIndex((prev) => (prev - 1 + totalPages) % totalPages)
+        }
 
 	// Calculate progress percentage for the timer
 	const timerProgress =
@@ -325,53 +418,105 @@ export default function RoomPage() {
 								onClose={() => setShowAdminControls(false)}
 							/>
 						)}
-                                                <div className='w-full flex flex-col items-center justify-center mt-8'>
-                                                        <div className='relative h-[170px] sm:h-[150px] w-[230px] sm:w-[250px] md:w-[300px]'>
-                                                                <div className='w-full h-full bg-[#2A2A2A] rounded-lg flex flex-col items-center justify-center shadow-2xl'>
-                                                                        <div className='w-[95%] h-[85%] bg-[#333333] rounded-lg flex flex-col items-center justify-center shadow-inner relative'>
+                                                <div className='w-full flex flex-col items-center justify-center mt-8 gap-6'>
+                                                        <div className='relative w-full max-w-4xl aspect-square flex items-center justify-center'>
+                                                                {showCarouselControls && (
+                                                                        <>
+                                                                                <button
+                                                                                        type='button'
+                                                                                        onClick={handlePreviousPage}
+                                                                                        className='hidden sm:flex absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-white/80 dark:bg-white/10 backdrop-blur px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-100 shadow-lg transition-colors hover:bg-white/90 dark:hover:bg-white/20'
+                                                                                        aria-label='Show previous seating group'
+                                                                                >
+                                                                                        ‹
+                                                                                </button>
+                                                                                <button
+                                                                                        type='button'
+                                                                                        onClick={handleNextPage}
+                                                                                        className='hidden sm:flex absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-white/80 dark:bg-white/10 backdrop-blur px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-100 shadow-lg transition-colors hover:bg-white/90 dark:hover:bg-white/20'
+                                                                                        aria-label='Show next seating group'
+                                                                                >
+                                                                                        ›
+                                                                                </button>
+                                                                        </>
+                                                                )}
+                                                                <div className='absolute inset-[7%] sm:inset-[8%] rounded-full bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border border-white/10 shadow-[0_30px_120px_-40px_rgba(15,23,42,0.7)] flex flex-col items-center justify-center text-center px-8 py-12'>
+                                                                        <div className='flex flex-col items-center gap-3 text-white/90'>
                                                                                 <Image
                                                                                         src={vercelLogo}
-                                                                                        alt='Menicon Logo'
-                                                                                        width={40}
-                                                                                        height={40}
-                                                                                        className='mb-4'
+                                                                                        alt='Cloud Deck logo'
+                                                                                        width={56}
+                                                                                        height={56}
+                                                                                        className='opacity-90'
                                                                                 />
-                                                                                <h2 className='text-white text-lg font-medium'>
-                                                                                        {'Cloud Deck'}
+                                                                                <h2 className='text-xl sm:text-2xl font-semibold tracking-wide text-white'>
+                                                                                        Cloud Deck
                                                                                 </h2>
+                                                                                <p className='text-xs sm:text-sm text-white/60 max-w-[200px]'>
+                                                                                        Collaborative planning table
+                                                                                </p>
                                                                         </div>
                                                                 </div>
-                                                        </div>
-                                                        {/* Player grid */}
-                                                        <div className='mt-8 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 justify-items-center'>
-                                                                {displayedPlayers.map((user) => (
-                                                                        <PlayerCard
+                                                                <div className='absolute inset-[3%] sm:inset-[4%] rounded-full border border-white/10 dark:border-white/5 pointer-events-none' />
+                                                                {displayedPlayers.map((user, index) => (
+                                                                        <div
                                                                                 key={user.id}
-                                                                                player={user}
-                                                                                revealed={room.revealed}
-                                                                                isCurrentUser={currentUser?.id === user.id}
-                                                                                timerProgress={
-                                                                                        room.isVoting &&
-                                                                                        timeLeft !== null &&
-                                                                                        user.role === 'estimator'
-                                                                                                ? (timeLeft / DEFAULT_TIMER_DURATION) * 100
-                                                                                                : undefined
-                                                                                }
-                                                                        />
+                                                                                className='absolute left-1/2 top-1/2'
+                                                                                style={{ transform: getSeatTransform(index, displayedPlayers.length, seatRadius) }}
+                                                                        >
+                                                                                <PlayerCard
+                                                                                        player={user}
+                                                                                        revealed={room.revealed}
+                                                                                        isCurrentUser={currentUser?.id === user.id}
+                                                                                        timerProgress={
+                                                                                                room.isVoting &&
+                                                                                                timeLeft !== null &&
+                                                                                                user.role === 'estimator'
+                                                                                                        ? (timeLeft / DEFAULT_TIMER_DURATION) * 100
+                                                                                                        : undefined
+                                                                                        }
+                                                                                        position={getSeatPosition(index, displayedPlayers.length)}
+                                                                                />
+                                                                        </div>
                                                                 ))}
                                                         </div>
+                                                        {showCarouselControls && (
+                                                                <div className='flex flex-col items-center gap-3 text-center text-sm text-gray-600 dark:text-gray-300'>
+                                                                        <div className='flex items-center gap-2'>
+                                                                                <button
+                                                                                        type='button'
+                                                                                        onClick={handlePreviousPage}
+                                                                                        className='px-3 py-1 rounded-full border border-gray-200 dark:border-white/20 bg-white dark:bg-white/10 text-gray-700 dark:text-gray-100 shadow-sm hover:bg-gray-50 dark:hover:bg-white/20 transition'
+                                                                                >
+                                                                                        Previous
+                                                                                </button>
+                                                                                <span>
+                                                                                        Seats {startIndex + 1}–
+                                                                                        {Math.min(startIndex + PLAYERS_PER_PAGE, room.users.length)} of {room.users.length}
+                                                                                </span>
+                                                                                <button
+                                                                                        type='button'
+                                                                                        onClick={handleNextPage}
+                                                                                        className='px-3 py-1 rounded-full border border-gray-200 dark:border-white/20 bg-white dark:bg-white/10 text-gray-700 dark:text-gray-100 shadow-sm hover:bg-gray-50 dark:hover:bg-white/20 transition'
+                                                                                >
+                                                                                        Next
+                                                                                </button>
+                                                                        </div>
+                                                                        <div className='flex items-center gap-1'>
+                                                                                {Array.from({ length: totalPages }).map((_, indicatorIndex) => (
+                                                                                        <span
+                                                                                                key={`indicator-${indicatorIndex}`}
+                                                                                                className={`h-2 w-2 rounded-full ${
+                                                                                                        indicatorIndex === clampedPageIndex
+                                                                                                                ? 'bg-[#00A550]'
+                                                                                                                : 'bg-gray-300 dark:bg-gray-600'
+                                                                                                }`}
+                                                                                        />
+                                                                                ))}
+                                                                        </div>
+                                                                </div>
+                                                        )}
                                                 </div>
-                                                {/* Load more control for when there are more than 10 users */}
-                                                {room && room.users.length > visibleCount && (
-                                                        <div className='flex justify-center items-center mt-4 mb-4'>
-                                                                <button
-                                                                        onClick={loadMorePlayers}
-                                                                        className='px-3 py-1 bg-[#00A550] text-white rounded-md'
-                                                                >
-                                                                        Load more
-                                                                </button>
-                                                        </div>
-                                                )}
 					</div>
 
 					{/* Display voting results below the player circle area */}

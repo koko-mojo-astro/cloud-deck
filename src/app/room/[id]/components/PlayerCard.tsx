@@ -23,9 +23,9 @@ export default function PlayerCard({
 	position = 'top',
 }: PlayerCardProps) {
 	return (
-		<div
-			className={`flex ${position === 'top' ? 'flex-col' : position === 'bottom' ? 'flex-col' : 'flex-col-reverse'} items-center gap-2 sm:gap-3 w-[80px] sm:w-[110px]`} // Increased container width to match the text width
-		>
+                <div
+                        className={`flex ${position === 'top' ? 'flex-col' : 'flex-col-reverse'} items-center gap-2 sm:gap-3 w-[80px] sm:w-[110px]`} // Increased container width to match the text width
+                >
 			<div
 				className={`text-xs sm:text-sm font-medium ${
 					isCurrentUser
