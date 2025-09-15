@@ -10,7 +10,28 @@ export default {
     extend: {
       colors: {
         background: "var(--background)",
-        foreground: "var(--foreground)",
+        text: {
+          primary: "var(--foreground)",
+        },
+        brand: {
+          green: "#00A550",
+          "green-dark": "#008040",
+          red: "#EC1C24",
+          "red-dark": "#D01017",
+        },
+      },
+      spacing: {
+        xs: "0.25rem",
+        sm: "0.5rem",
+        md: "0.75rem",
+        lg: "1rem",
+        xl: "1.5rem",
+        "2xl": "2rem",
+        "4xl": "4rem",
+        "6xl": "6rem",
+      },
+      fontFamily: {
+        brand: ["var(--font-montserrat-sans)", "sans-serif"],
       },
       keyframes: {
         bounceIn: {
