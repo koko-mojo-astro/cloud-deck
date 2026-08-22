@@ -67,19 +67,22 @@ function RoomContent() {
 	const [currentPage, setCurrentPage] = useState(0)
 	const [now, setNow] = useState(() => Date.now())
 	const joinedRef = useRef(false)
+	const playerIdRef = useRef<string | null>(null)
 
 	// Realtime subscription: this single query replaces the socket connection
 	const { isLoading, error: dbError, data } = db.useQuery(
 		roomId
 			? {
-					rooms: { $: { where: { id: roomId } } },
+					rooms: { $: { where: { code: roomId } } },
 					players: { $: { where: { roomId } } },
 				}
 			: null
 	)
 
 	const roomData = data?.rooms?.[0]
+	const roomEid = roomData?.id
 	const players = data?.players ?? []
+	const myPlayer = players.find((p) => p.userId === userId)
 
 	const user: User = useMemo(
 		() => ({
@@ -100,7 +103,7 @@ function RoomContent() {
 		return () => clearInterval(t)
 	}, [])
 
-	// Join once the initial query resolves
+	// Join once the initial query resolves (self-heals if our row was swept)
 	useEffect(() => {
 		if (!roomId) {
 			setError('Room ID is required')
@@ -113,41 +116,75 @@ function RoomContent() {
 		setError(null)
 		if (!joinedRef.current && !isLoading) {
 			joinedRef.current = true
-			ensureRoomAndJoin(roomId, user, (data?.rooms?.length ?? 0) > 0)
+			ensureRoomAndJoin({
+				roomCode: roomId,
+				user,
+				roomExists: roomEid != null,
+				existingRoomId: roomEid ?? undefined,
+				existingPlayerId: myPlayer?.id,
+			})
 		}
-	}, [roomId, name, isLoading, user, data])
+	}, [roomId, name, isLoading, user, roomEid, myPlayer])
+
+	// Keep the room code in a ref for cleanup on unmount / tab close
+	useEffect(() => {
+		playerIdRef.current = myPlayer?.id ?? null
+	}, [myPlayer?.id])
 
 	// Presence heartbeat
 	useEffect(() => {
-		if (!roomId || !joinedRef.current) return
-		const beat = () => heartbeat(roomId, userId, Date.now())
+		const pid = playerIdRef.current
+		if (!pid) return
+		const beat = () => heartbeat(pid, Date.now())
+		beat()
 		const t = setInterval(beat, 20_000)
 		return () => clearInterval(t)
-	}, [roomId, userId])
+	}, [playerIdRef.current])
 
 	// Leave on unmount (navigation); best-effort on tab close
+	const roomIdRef = useRef<string | null>(null)
 	useEffect(() => {
-		if (!roomId) return
-		const onBeforeUnload = () => leaveRoom(roomId, userId)
+		roomIdRef.current = roomId
+		const onBeforeUnload = () => leaveRoom(playerIdRef.current)
 		window.addEventListener('beforeunload', onBeforeUnload)
 		return () => {
 			window.removeEventListener('beforeunload', onBeforeUnload)
-			leaveRoom(roomId, userId)
+			leaveRoom(playerIdRef.current)
 		}
-	}, [roomId, userId])
-
-	// Sweep disconnected players; delete room when the last one leaves
-	useEffect(() => {
-		if (!roomId || isLoading || !roomData) return
-		const t = setInterval(() => {
-			const stale = players.filter((p) => p.lastSeenAt < Date.now() - STALE_PLAYER_TTL_MS)
-			const activeCount = players.length - stale.length
-			sweepStalePlayers(stale.map((p) => p.id), activeCount, roomId)
-		}, 30_000)
-		return () => clearInterval(t)
-	}, [roomId, isLoading, roomData, players])
+	}, [roomId])
 
 	// Activate voting once the countdown elapses
+
+	// Self-heal presence + sweep disconnected players
+	useEffect(() => {
+		if (!roomId || isLoading || !joinedRef.current) return
+		const t = setInterval(() => {
+			const mine = players.find((p) => p.userId === userId)
+			if (!mine) {
+				// Our row was swept (e.g. long backgrounded tab): re-assert presence
+				ensureRoomAndJoin({
+					roomCode: roomId,
+					user,
+					roomExists: roomEid != null,
+					existingRoomId: roomEid ?? undefined,
+				})
+				return
+			}
+			if (!roomData) return
+			const stale = players.filter(
+				(p) =>
+					p.userId !== userId &&
+					p.lastSeenAt < Date.now() - STALE_PLAYER_TTL_MS
+			)
+			const activeCount = players.length - stale.length
+			sweepStalePlayers(
+				stale.map((p) => p.id),
+				activeCount,
+				roomData.id
+			)
+		}, 30_000)
+		return () => clearInterval(t)
+	}, [roomId, isLoading, roomData, roomEid, players, user, userId])
 
 	const countingDown =
 		!!roomData?.timerStartedAt &&
@@ -210,19 +247,19 @@ function RoomContent() {
 
 	// Auto-reveal when every estimator has voted (parity with the socket server)
 	useEffect(() => {
-		if (!roomId || !votingOpen || !users.length) return
+		if (!roomEid || !votingOpen || !users.length) return
 		const estimators = users.filter((u) => u.role === 'estimator')
 		if (estimators.length > 0 && estimators.every((e) => e.hasVoted)) {
-			revealVotes(roomId)
+			revealVotes(roomEid)
 		}
-	}, [roomId, votingOpen, users])
+	}, [roomEid, votingOpen, users])
 
 	// Auto-reveal when the timer expires (parity with the socket client behaviour)
 	useEffect(() => {
-		if (timeLeft === 0 && roomId && room && !room.revealed) {
-			revealVotes(roomId)
+		if (timeLeft === 0 && roomEid && room && !room.revealed) {
+			revealVotes(roomEid)
 		}
-	}, [timeLeft, roomId, room])
+	}, [timeLeft, roomEid, room])
 
 	if (error || dbError) {
 		return (
@@ -249,39 +286,42 @@ function RoomContent() {
 	}
 
 	const handleVote = (value: number) => {
-		if (roomId && currentUser && room && !room.revealed) {
-			submitVote(roomId, currentUser.id, value)
+		if (myPlayer && room && votingOpen) {
+			submitVote(myPlayer.id, value)
 		}
 	}
 
 	const handleRevealVotes = () => {
-		if (roomId) {
-			revealVotes(roomId)
+		if (roomEid) {
+			revealVotes(roomEid)
 		}
 	}
 
 	const handleResetVotes = () => {
-		if (roomId) {
-			resetVotes(roomId, players.map((p) => ({ id: p.id })))
+		if (roomEid) {
+			resetVotes(
+				roomEid,
+				players.map((p) => p.id)
+			)
 		}
 	}
 
 	const handleStartVoting = () => {
-		if (roomId) {
-			startVoting(roomId)
+		if (roomEid) {
+			startVoting(roomEid)
 		}
 	}
 
 	// Admin handlers for room enabling/disabling and timer settings
 	const handleToggleRoomEnabled = (enabled: boolean) => {
-		if (roomId) {
-			toggleRoomEnabled(roomId, enabled)
+		if (roomEid) {
+			toggleRoomEnabled(roomEid, enabled)
 		}
 	}
 
 	const handleSetRoomTimer = (duration: number) => {
-		if (roomId) {
-			setRoomTimer(roomId, duration)
+		if (roomEid) {
+			setRoomTimer(roomEid, duration)
 		}
 	}
 

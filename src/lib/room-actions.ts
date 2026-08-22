@@ -1,3 +1,4 @@
+import { id } from '@instantdb/react'
 import { FIBONACCI_SEQUENCE, User } from '@/types/room'
 import { db } from './db'
 
@@ -5,18 +6,29 @@ export const PLAYER_ACTIVE_WINDOW_MS = 65_000
 export const STALE_PLAYER_TTL_MS = 120_000
 const COUNTDOWN_MS = 3_000
 
-const playerKey = (roomId: string, userId: string) => `${roomId}:${userId}`
+/**
+ * InstantDB requires entity ids to be UUIDs. All transact failures are caught
+ * here so a transient DB error can never white-screen the app again.
+ */
+export function safeTransact(txs: unknown) {
+	Promise.resolve(db.transact(txs as any)).catch((e) =>
+		console.error('[instantdb] transaction failed:', e)
+	)
+}
 
-export function ensureRoomAndJoin(
-	roomId: string,
-	user: User,
+export function ensureRoomAndJoin(opts: {
+	roomCode: string
+	user: User
 	roomExists: boolean
-) {
+	existingRoomId?: string
+	existingPlayerId?: string
+}) {
 	const now = Date.now()
-	// Mixed room+player transaction chunks
+	const { roomCode, user, roomExists } = opts
+
 	const txs: any[] = [
-		db.tx.players[playerKey(roomId, user.id)].update({
-			roomId,
+		db.tx.players[opts.existingPlayerId ?? id()].update({
+			roomId: roomCode,
 			userId: user.id,
 			name: user.name,
 			role: user.role,
@@ -28,7 +40,8 @@ export function ensureRoomAndJoin(
 
 	if (!roomExists) {
 		txs.push(
-			db.tx.rooms[roomId].update({
+			db.tx.rooms[opts.existingRoomId ?? id()].update({
+				code: roomCode,
 				name: user.roomName || 'Planning Poker Room',
 				createdAt: now,
 				votingOptions:
@@ -42,50 +55,47 @@ export function ensureRoomAndJoin(
 		)
 	}
 
-	db.transact(txs)
+	safeTransact(txs)
 }
 
-export function heartbeat(roomId: string, userId: string, lastSeenAt: number) {
-	db.transact(
-		db.tx.players[playerKey(roomId, userId)].merge({
-			lastSeenAt,
-		})
-	)
+export function heartbeat(playerId: string, lastSeenAt: number) {
+	safeTransact(db.tx.players[playerId].merge({ lastSeenAt }))
 }
 
-export function leaveRoom(roomId: string, userId: string) {
-	db.transact(db.tx.players[playerKey(roomId, userId)].delete())
+export function leaveRoom(playerId: string | null) {
+	if (!playerId) return
+	safeTransact(db.tx.players[playerId].delete())
 }
 
+/** Mirrors the socket server GC: drop stale players; delete the room when nobody is left */
 export function sweepStalePlayers(
 	stalePlayerIds: string[],
 	activePlayerCount: number,
-	roomId: string
+	roomId: string | null
 ) {
 	if (!stalePlayerIds.length && activePlayerCount > 0) return
 
-	const txs: any[] = stalePlayerIds.map((id) => db.tx.players[id].delete())
+	const txs: any[] = stalePlayerIds.map((pid) => db.tx.players[pid].delete())
 
-	// Mirror the socket server: delete the room when nobody is left in it
-	if (activePlayerCount === 0) {
+	if (activePlayerCount === 0 && roomId) {
 		txs.push(db.tx.rooms[roomId].delete())
 	}
 
-	if (txs.length) db.transact(txs)
+	if (txs.length) safeTransact(txs)
 }
 
-export function startVoting(roomId: string) {
-	db.transact(
-		db.tx.rooms[roomId].update({
+export function startVoting(roomEid: string) {
+	safeTransact(
+		db.tx.rooms[roomEid].update({
 			timerStartedAt: Date.now() + COUNTDOWN_MS,
 			revealed: false,
 		})
 	)
 }
 
-export function submitVote(roomId: string, userId: string, vote: number) {
-	db.transact(
-		db.tx.players[playerKey(roomId, userId)].merge({
+export function submitVote(playerEid: string, vote: number) {
+	safeTransact(
+		db.tx.players[playerEid].merge({
 			vote,
 			hasVoted: true,
 			lastSeenAt: Date.now(),
@@ -93,31 +103,33 @@ export function submitVote(roomId: string, userId: string, vote: number) {
 	)
 }
 
-export function revealVotes(roomId: string) {
-	db.transact(
-		db.tx.rooms[roomId].update({
+export function revealVotes(roomEid: string) {
+	safeTransact(
+		db.tx.rooms[roomEid].update({
 			revealed: true,
 		})
 	)
 }
 
-export function resetVotes(roomId: string, players: { id: string }[]) {
-	const txs: any[] = players.map((p) =>
-		db.tx.players[p.id].merge({ vote: null, hasVoted: false })
+const UNSET = null as unknown as number
+
+export function resetVotes(roomEid: string, playerIds: string[]) {
+	const txs: any[] = playerIds.map((pid) =>
+		db.tx.players[pid].merge({ vote: null, hasVoted: false })
 	)
 	txs.push(
-		db.tx.rooms[roomId].merge({
+		db.tx.rooms[roomEid].merge({
 			revealed: false,
-			timerStartedAt: null as unknown as number,
+			timerStartedAt: UNSET,
 		})
 	)
-	db.transact(txs)
+	safeTransact(txs)
 }
 
-export function toggleRoomEnabled(roomId: string, enabled: boolean) {
-	db.transact(db.tx.rooms[roomId].merge({ enabled }))
+export function toggleRoomEnabled(roomEid: string, enabled: boolean) {
+	safeTransact(db.tx.rooms[roomEid].merge({ enabled }))
 }
 
-export function setRoomTimer(roomId: string, duration: number) {
-	db.transact(db.tx.rooms[roomId].merge({ timerDuration: duration }))
+export function setRoomTimer(roomEid: string, duration: number) {
+	safeTransact(db.tx.rooms[roomEid].merge({ timerDuration: duration }))
 }

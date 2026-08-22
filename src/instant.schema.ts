@@ -3,6 +3,7 @@ import { i } from '@instantdb/react';
 const _schema = i.schema({
 	entities: {
 		rooms: i.entity({
+			code: i.string().unique().indexed(),
 			name: i.string(),
 			createdAt: i.number(),
 			votingOptions: i.any(),
