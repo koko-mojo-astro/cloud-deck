@@ -130,3 +130,27 @@ export function toggleRoomEnabled(roomEid: string, enabled: boolean) {
 export function setRoomTimer(roomEid: string, duration: number) {
 	safeTransact(db.tx.rooms[roomEid].merge({ timerDuration: duration }))
 }
+
+/**
+ * Remove everyone from the room immediately and tombstone the room itself.
+ * The tombstone (only code + disbandedAt remain) keeps invite links dead;
+ * purgeDisbandedRooms clears it out later.
+ */
+export function disbandRoom(roomEid: string, playerIds: string[]) {
+	const txs: any[] = playerIds.map((pid) => db.tx.players[pid].delete())
+	txs.push(db.tx.rooms[roomEid].merge({ disbandedAt: Date.now() }))
+	safeTransact(txs)
+}
+
+/** Hard-delete rooms disbanded longer ago than `olderThanMs` */
+export function purgeDisbandedRooms(
+	rooms: { id: string; disbandedAt?: number }[],
+	olderThanMs: number
+) {
+	const now = Date.now()
+	const ids = rooms
+		.filter((r) => r.disbandedAt && now - r.disbandedAt > olderThanMs)
+		.map((r) => r.id)
+	if (!ids.length) return
+	safeTransact(ids.map((rid) => db.tx.rooms[rid].delete()))
+}

@@ -1,7 +1,7 @@
 'use client'
 
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
 	User,
 	Room,
@@ -12,6 +12,8 @@ import { db } from '@/lib/db'
 import {
 	ensureRoomAndJoin,
 	heartbeat,
+	disbandRoom,
+	purgeDisbandedRooms,
 	leaveRoom,
 	purgeAbandonedPlayers,
 	revealVotes,
@@ -51,6 +53,7 @@ const COUNTDOWN_MS = 3_000
 function RoomContent() {
 	const [showAdminControls, setShowAdminControls] = useState(false)
 	const searchParams = useSearchParams()
+	const router = useRouter()
 	const roomId = searchParams?.get('id')
 	const name = searchParams?.get('name') || ''
 	const role = (searchParams?.get('role') || 'estimator') as
@@ -63,6 +66,8 @@ function RoomContent() {
 	const [userId] = useState(() => Math.random().toString(36).substring(2, 9))
 
 	const [error, setError] = useState<string | null>(null)
+	const [disbanded, setDisbanded] = useState(false)
+	const hadRoomRef = useRef(false)
 	const [inviteToast, setInviteToast] = useState('')
 	const [currentPage, setCurrentPage] = useState(0)
 	const [now, setNow] = useState(() => Date.now())
@@ -83,6 +88,7 @@ function RoomContent() {
 	const roomEid = roomData?.id
 	const players = data?.players ?? []
 	const myPlayer = players.find((p) => p.userId === userId)
+	const isDisbanded = disbanded || !!roomData?.disbandedAt
 
 	const user: User = useMemo(
 		() => ({
@@ -103,8 +109,21 @@ function RoomContent() {
 		return () => clearInterval(t)
 	}, [])
 
+	// Detect room removal (admin disband): stop presence writes and show a notice
+	useEffect(() => {
+		if (roomEid) {
+			hadRoomRef.current = true
+		}
+		if (roomData?.disbandedAt && !disbanded) {
+			setDisbanded(true)
+		} else if (!roomEid && hadRoomRef.current && !isLoading) {
+			setDisbanded(true)
+		}
+	}, [roomEid, isLoading, roomData?.disbandedAt, disbanded])
+
 	// Join once the initial query resolves (self-heals if our row was swept)
 	useEffect(() => {
+		if (isDisbanded) return
 		if (!roomId) {
 			setError('Room ID is required')
 			return
@@ -136,7 +155,7 @@ function RoomContent() {
 	// fresh heartbeat the moment the tab becomes relevant again.
 	useEffect(() => {
 		const pid = playerIdRef.current
-		if (!pid) return
+		if (!pid || disbanded) return
 		let lastBeat = 0
 		const beat = () => {
 			const t = Date.now()
@@ -160,7 +179,7 @@ function RoomContent() {
 			window.removeEventListener('pointerdown', wake)
 			window.removeEventListener('keydown', wake)
 		}
-	}, [playerIdRef.current])
+	}, [playerIdRef.current, isDisbanded])
 
 	// Leave on unmount (navigation); best-effort on tab close
 	const roomIdRef = useRef<string | null>(null)
@@ -182,6 +201,7 @@ function RoomContent() {
 	useEffect(() => {
 		if (!roomId || isLoading || !joinedRef.current) return
 		const t = setInterval(() => {
+			if (isDisbanded) return
 			const mine = players.find((p) => p.userId === userId)
 			if (!mine || mine.lastSeenAt < Date.now() - PLAYER_ACTIVE_WINDOW_MS) {
 				ensureRoomAndJoin({
@@ -194,10 +214,10 @@ function RoomContent() {
 			}
 		}, 15_000)
 		return () => clearInterval(t)
-	}, [roomId, isLoading, roomEid, players, user, userId])
+	}, [roomId, isLoading, roomEid, players, user, userId, isDisbanded])
 
-	// Hygiene: purge rows abandoned for over a day. Rooms are never deleted
-	// automatically, so a room link stays valid for the whole session.
+	// Hygiene: purge rows abandoned for over a day, and hard-delete disband
+	// tombstones after an hour. Live rooms are never touched.
 	useEffect(() => {
 		if (!roomId || isLoading) return
 		const t = setInterval(() => {
@@ -207,9 +227,12 @@ function RoomContent() {
 					p.lastSeenAt < Date.now() - STALE_PLAYER_TTL_MS
 			)
 			purgeAbandonedPlayers(stale.map((p) => p.id))
+			if (roomData?.disbandedAt) {
+				purgeDisbandedRooms([roomData], 60 * 60_000)
+			}
 		}, 5 * 60_000)
 		return () => clearInterval(t)
-	}, [roomId, isLoading, players, userId])
+	}, [roomId, isLoading, players, userId, roomData])
 
 	const countingDown =
 		!!roomData?.timerStartedAt &&
@@ -302,6 +325,27 @@ function RoomContent() {
 		)
 	}
 
+	if (isDisbanded) {
+		return (
+			<div className='min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800'>
+				<div className='text-center'>
+					<h1 className='text-2xl font-bold text-gray-900 dark:text-white mb-lg'>
+						This room has been disbanded
+					</h1>
+					<p className='text-gray-600 dark:text-gray-300 mb-xl'>
+						The admin ended this session. Invite links for this room no longer work.
+					</p>
+					<button
+						onClick={() => router.push('/')}
+						className='px-lg py-md text-sm font-semibold text-white bg-brand-green hover:bg-brand-green-dark rounded-md shadow-sm transition-colors duration-200'
+					>
+						Back to Home
+					</button>
+				</div>
+			</div>
+		)
+	}
+
 	if (!room) {
 		return (
 			<div className='min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800'>
@@ -352,6 +396,21 @@ function RoomContent() {
 		if (roomEid) {
 			setRoomTimer(roomEid, duration)
 		}
+	}
+
+	const handleDisband = () => {
+		if (!roomEid) return
+		if (
+			!window.confirm(
+				'Disband this room? All players will be removed and invite links will stop working.'
+			)
+		)
+			return
+		disbandRoom(
+			roomEid,
+			players.map((p) => p.id)
+		)
+		router.push('/')
 	}
 
 	const handleCopyInviteLink = () => {
@@ -457,6 +516,12 @@ function RoomContent() {
                                                                                 className='px-md md:px-lg py-sm bg-brand-green hover:bg-brand-green-dark text-white rounded-md shadow-sm transition-colors duration-200 text-sm md:text-base'
                                                                         >
                                                                                 Admin Settings
+                                                                        </button>
+                                                                        <button
+                                                                                onClick={handleDisband}
+                                                                                className='px-md md:px-lg py-sm bg-brand-red hover:bg-brand-red-dark text-white rounded-md shadow-sm transition-colors duration-200 text-sm md:text-base'
+                                                                        >
+                                                                                Disband Room
                                                                         </button>
 								</div>
 							)}
