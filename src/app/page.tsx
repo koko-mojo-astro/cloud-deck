@@ -23,7 +23,7 @@ export default function Home() {
 		if (!name.trim()) return
 		const roomId = Math.random().toString(36).substring(2, 8)
 		router.push(
-			`/room/${roomId}?name=${encodeURIComponent(
+			`/room/?id=${roomId}&name=${encodeURIComponent(
 				name
 			)}&roomName=${encodeURIComponent(
 				roomName || 'Planning Poker Room'

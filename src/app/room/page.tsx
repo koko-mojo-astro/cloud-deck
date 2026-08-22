@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useParams, useSearchParams } from 'next/navigation'
+import { Suspense, useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { io, Socket } from 'socket.io-client'
 import {
 	User,
@@ -14,12 +14,28 @@ import PlayerCard from './components/PlayerCard'
 import VotingResults from './components/VotingResults'
 import AdminControls from './components/AdminControls'
 import Image from 'next/image'
-import vercelLogo from '../../../public/vercel.svg'
+import vercelLogo from '../../public/vercel.svg'
 
 export default function RoomPage() {
+	return (
+		<Suspense
+			fallback={
+				<div className='min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800'>
+					<h1 className='text-2xl font-bold text-gray-900 dark:text-white'>
+						Loading...
+					</h1>
+				</div>
+			}
+		>
+			<RoomContent />
+		</Suspense>
+	)
+}
+
+function RoomContent() {
 	const [showAdminControls, setShowAdminControls] = useState(false)
-	const params = useParams()
 	const searchParams = useSearchParams()
+	const roomId = searchParams?.get('id')
 	const [socket, setSocket] = useState<Socket | null>(null)
 	const [room, setRoom] = useState<Room | null>(null)
 	const [error, setError] = useState<string | null>(null)
@@ -32,6 +48,10 @@ export default function RoomPage() {
 
 	useEffect(() => {
 		const name = searchParams?.get('name')
+		if (!roomId) {
+			setError('Room ID is required')
+			return
+		}
 		if (!name) {
 			setError('Name is required')
 			return
@@ -63,7 +83,7 @@ export default function RoomPage() {
 		setCurrentUser(user)
 
 		newSocket.on('connect', () => {
-			newSocket.emit('joinRoom', params?.id as string, user)
+			newSocket.emit('joinRoom', roomId, user)
 		})
 
 		newSocket.on('countdownStarted', () => {
@@ -101,7 +121,7 @@ export default function RoomPage() {
 			}
 
 			setRoom(updatedRoom)
-			const url = `${window.location.origin}/join/${params?.id}`
+			const url = `${window.location.origin}/join/?id=${roomId}`
 			setInviteUrl(url)
 
 			// Handle timer updates
@@ -124,11 +144,11 @@ export default function RoomPage() {
 
 		return () => {
 			if (newSocket) {
-				newSocket.emit('leaveRoom', params?.id as string, user.id)
+				newSocket.emit('leaveRoom', roomId, user.id)
 				newSocket.disconnect()
 			}
 		}
-	}, [params?.id, searchParams])
+	}, [roomId, searchParams])
 
 	// Timer countdown effect
 	useEffect(() => {
@@ -215,7 +235,7 @@ export default function RoomPage() {
 	}
 
 	const handleCopyInviteLink = () => {
-		const url = `${window.location.origin}/join/${params?.id}/?roomName=${
+		const url = `${window.location.origin}/join/?id=${roomId}&roomName=${
 			currentUser?.roomName ? encodeURIComponent(currentUser?.roomName) : 'room'
 		}`
 		navigator.clipboard.writeText(url)

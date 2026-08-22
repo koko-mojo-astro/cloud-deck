@@ -44,7 +44,11 @@ export const initSocketServer = (httpServer: HttpServer) => {
     SocketData
   >(httpServer, {
     cors: {
-      origin: process.env.RENDER_EXTERNAL_URL || process.env.NEXT_PUBLIC_SOCKET_URL, // For production, you might want to restrict this
+      // Comma-separated list of allowed frontend origins (e.g. the Render Static Site URL).
+      // Falls back to reflecting any origin when unset.
+      origin: process.env.CORS_ORIGIN
+        ? process.env.CORS_ORIGIN.split(',').map((o) => o.trim())
+        : true,
       methods: ['GET', 'POST'],
       credentials: true,
     },

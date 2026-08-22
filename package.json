@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "node -r @swc-node/register src/server/index.ts",
+    "start": "node -r @swc-node/register src/server/socket-server.ts",
     "lint": "next lint",
     "dev:server": "node -r @swc-node/register src/server/index.ts"
   },
