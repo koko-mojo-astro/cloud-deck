@@ -1,202 +1,302 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useParams, useSearchParams } from 'next/navigation'
-import { io, Socket } from 'socket.io-client'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import {
 	User,
 	Room,
 	FIBONACCI_SEQUENCE,
 	DEFAULT_TIMER_DURATION,
 } from '@/types/room'
+import { db } from '@/lib/db'
+import {
+	ensureRoomAndJoin,
+	heartbeat,
+	leaveRoom,
+	purgeAbandonedPlayers,
+	revealVotes,
+	resetVotes,
+	setRoomTimer,
+	startVoting,
+	submitVote,
+	toggleRoomEnabled,
+	PLAYER_ACTIVE_WINDOW_MS,
+	STALE_PLAYER_TTL_MS,
+} from '@/lib/room-actions'
 import VotingControls from './components/VotingControls'
 import PlayerCard from './components/PlayerCard'
 import VotingResults from './components/VotingResults'
 import AdminControls from './components/AdminControls'
 import Image from 'next/image'
-import vercelLogo from '../../../public/vercel.svg'
+import vercelLogo from '../../public/vercel.svg'
 
 export default function RoomPage() {
-	const [showAdminControls, setShowAdminControls] = useState(false)
-	const params = useParams()
-	const searchParams = useSearchParams()
-	const [socket, setSocket] = useState<Socket | null>(null)
-	const [room, setRoom] = useState<Room | null>(null)
-	const [error, setError] = useState<string | null>(null)
-	const [inviteUrl, setInviteUrl] = useState('')
-	const [inviteToast, setInviteToast] = useState('')
-	const [currentUser, setCurrentUser] = useState<User | null>(null)
-	const [timeLeft, setTimeLeft] = useState<number | null>(null)
-	const [countdown, setCountdown] = useState<number | null>(null)
-	const [currentPage, setCurrentPage] = useState(0)
+	return (
+		<Suspense
+			fallback={
+				<div className='min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800'>
+					<h1 className='text-2xl font-bold text-gray-900 dark:text-white'>
+						Loading...
+					</h1>
+				</div>
+			}
+		>
+			<RoomContent />
+		</Suspense>
+	)
+}
 
+const COUNTDOWN_MS = 3_000
+
+function RoomContent() {
+	const [showAdminControls, setShowAdminControls] = useState(false)
+	const searchParams = useSearchParams()
+	const roomId = searchParams?.get('id')
+	const name = searchParams?.get('name') || ''
+	const role = (searchParams?.get('role') || 'estimator') as
+		| 'estimator'
+		| 'observer'
+		| 'admin'
+	const roomName = searchParams?.get('roomName') || 'Planning Poker Room'
+
+	// Stable per-tab identity, mirroring the previous socket-session behaviour
+	const [userId] = useState(() => Math.random().toString(36).substring(2, 9))
+
+	const [error, setError] = useState<string | null>(null)
+	const [inviteToast, setInviteToast] = useState('')
+	const [currentPage, setCurrentPage] = useState(0)
+	const [now, setNow] = useState(() => Date.now())
+	const joinedRef = useRef(false)
+	const playerIdRef = useRef<string | null>(null)
+
+	// Realtime subscription: this single query replaces the socket connection
+	const { isLoading, error: dbError, data } = db.useQuery(
+		roomId
+			? {
+					rooms: { $: { where: { code: roomId } } },
+					players: { $: { where: { roomId } } },
+				}
+			: null
+	)
+
+	const roomData = data?.rooms?.[0]
+	const roomEid = roomData?.id
+	const players = data?.players ?? []
+	const myPlayer = players.find((p) => p.userId === userId)
+
+	const user: User = useMemo(
+		() => ({
+			id: userId,
+			name,
+			vote: null,
+			hasVoted: false,
+			role,
+			roomName,
+			votingOptions: FIBONACCI_SEQUENCE,
+		}),
+		[userId, name, role, roomName]
+	)
+
+	// Ticking clock drives countdown, timer and presence windows
 	useEffect(() => {
-		const name = searchParams?.get('name')
+		const t = setInterval(() => setNow(Date.now()), 1000)
+		return () => clearInterval(t)
+	}, [])
+
+	// Join once the initial query resolves (self-heals if our row was swept)
+	useEffect(() => {
+		if (!roomId) {
+			setError('Room ID is required')
+			return
+		}
 		if (!name) {
 			setError('Name is required')
 			return
 		}
-                const socket_url =
-                        process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3000'
-                const newSocket = io(socket_url, {
-                        path: '/socket.io',
-                        transports: ['websocket', 'polling'],
-                        reconnectionAttempts: 5,
-                        reconnectionDelay: 1000,
-                        timeout: 10000,
-			autoConnect: true,
-			forceNew: true,
-		})
-		setSocket(newSocket)
-
-		const role = searchParams?.get('role') || 'estimator'
-		const roomName = searchParams?.get('roomName') || 'Planning Poker Room'
-		const user: User = {
-			id: Math.random().toString(36).substring(2, 9),
-			name,
-			vote: null,
-			hasVoted: false,
-			role: role as 'estimator' | 'observer' | 'admin',
-			roomName,
-			votingOptions: FIBONACCI_SEQUENCE,
-		}
-		setCurrentUser(user)
-
-		newSocket.on('connect', () => {
-			newSocket.emit('joinRoom', params?.id as string, user)
-		})
-
-		newSocket.on('countdownStarted', () => {
-			setCountdown(3)
-			const countdownInterval = setInterval(() => {
-				setCountdown((prev) => {
-					if (prev === null || prev <= 1) {
-						clearInterval(countdownInterval)
-						return null
-					}
-					return prev - 1
-				})
-			}, 1000)
-
-			// Clear countdown after 3 seconds
-			setTimeout(() => {
-				clearInterval(countdownInterval)
-				setCountdown(null)
-			}, 3000)
-		})
-
-		newSocket.on('roomUpdated', (updatedRoom: Room) => {
-			// Update current user's vote from the room state
-			const updatedCurrentUser = updatedRoom.users.find((u) => u.id === user.id)
-			if (updatedCurrentUser) {
-				setCurrentUser(updatedCurrentUser)
-			}
-			// Reset current user's vote if voting options have changed
-			if (
-				room &&
-				JSON.stringify(room.votingOptions) !==
-					JSON.stringify(updatedRoom.votingOptions)
-			) {
-				newSocket.emit('submitVote', updatedRoom.id, user.id, null)
-			}
-
-			setRoom(updatedRoom)
-			const url = `${window.location.origin}/join/${params?.id}`
-			setInviteUrl(url)
-
-			// Handle timer updates
-			if (updatedRoom.revealed) {
-				setTimeLeft(null) // Reset timer when votes are revealed
-			} else if (updatedRoom.isVoting && updatedRoom.timerStartedAt) {
-				const startTime = new Date(updatedRoom.timerStartedAt).getTime()
-				const now = new Date().getTime()
-				const elapsed = Math.floor((now - startTime) / 1000)
-				const remaining = Math.max(0, updatedRoom.timerDuration - elapsed)
-				setTimeLeft(remaining)
-			} else {
-				setTimeLeft(null)
-			}
-		})
-
-		newSocket.on('connect_error', () => {
-			setError('Failed to connect to server')
-		})
-
-		return () => {
-			if (newSocket) {
-				newSocket.emit('leaveRoom', params?.id as string, user.id)
-				newSocket.disconnect()
-			}
-		}
-	}, [params?.id, searchParams])
-
-	// Timer countdown effect
-	useEffect(() => {
-		if (timeLeft === null || timeLeft === 0 || room?.revealed) return
-
-		const timer = setInterval(() => {
-			setTimeLeft((prev) => {
-				if (prev === null || prev <= 0 || room?.revealed) {
-					clearInterval(timer)
-					return 0
-				}
-				return prev - 1
+		setError(null)
+		if (!joinedRef.current && !isLoading) {
+			joinedRef.current = true
+			ensureRoomAndJoin({
+				roomCode: roomId,
+				user,
+				roomExists: roomEid != null,
+				existingRoomId: roomEid ?? undefined,
+				existingPlayerId: myPlayer?.id,
 			})
-		}, 1000)
+		}
+	}, [roomId, name, isLoading, user, roomEid, myPlayer])
 
-		return () => clearInterval(timer)
-	}, [timeLeft, room?.revealed])
-
-	// Auto-reveal votes when timer reaches 0
+	// Keep the room code in a ref for cleanup on unmount / tab close
 	useEffect(() => {
-		if (timeLeft === 0 && socket && room && !room.revealed) {
-			socket.emit('revealVotes', room.id)
-			setTimeLeft(null) // Reset timer when votes are revealed
-		}
-	}, [timeLeft, socket, room])
+		playerIdRef.current = myPlayer?.id ?? null
+	}, [myPlayer?.id])
 
-	const handleVote = (value: number) => {
-		if (socket && currentUser && room && !room.revealed) {
-			socket.emit('submitVote', room.id, currentUser.id, value)
+	// Presence heartbeat: interval while visible + instant beat on user activity.
+	// Background tabs throttle timers, so focus/visibility events guarantee a
+	// fresh heartbeat the moment the tab becomes relevant again.
+	useEffect(() => {
+		const pid = playerIdRef.current
+		if (!pid) return
+		let lastBeat = 0
+		const beat = () => {
+			const t = Date.now()
+			if (t - lastBeat < 5_000) return
+			lastBeat = t
+			heartbeat(pid, t)
 		}
-	}
-
-	const handleRevealVotes = () => {
-		if (socket && room) {
-			socket.emit('revealVotes', room.id)
+		beat()
+		const t = setInterval(beat, 30_000)
+		const wake = () => {
+			if (document.visibilityState === 'visible') beat()
 		}
-	}
-
-	const handleResetVotes = () => {
-		if (socket && room) {
-			socket.emit('resetVotes', room.id)
+		document.addEventListener('visibilitychange', wake)
+		window.addEventListener('focus', wake)
+		window.addEventListener('pointerdown', wake)
+		window.addEventListener('keydown', wake)
+		return () => {
+			clearInterval(t)
+			document.removeEventListener('visibilitychange', wake)
+			window.removeEventListener('focus', wake)
+			window.removeEventListener('pointerdown', wake)
+			window.removeEventListener('keydown', wake)
 		}
-	}
+	}, [playerIdRef.current])
 
-	const handleStartVoting = () => {
-		if (socket && room) {
-			socket.emit('startVoting', room.id)
+	// Leave on unmount (navigation); best-effort on tab close
+	const roomIdRef = useRef<string | null>(null)
+	useEffect(() => {
+		roomIdRef.current = roomId
+		const onBeforeUnload = () => leaveRoom(playerIdRef.current)
+		window.addEventListener('beforeunload', onBeforeUnload)
+		return () => {
+			window.removeEventListener('beforeunload', onBeforeUnload)
+			leaveRoom(playerIdRef.current)
 		}
-	}
+	}, [roomId])
 
-	// Admin handlers for room enabling/disabling and timer settings
-	const handleToggleRoomEnabled = (enabled: boolean) => {
-		if (socket && room) {
-			socket.emit('toggleRoomEnabled', room.id, enabled)
+	// Activate voting once the countdown elapses
+
+	// Self-heal: re-assert our presence if our row vanished or went stale
+	// (e.g. after a long-throttled background tab). Runs frequently and is
+	// idempotent, so a session survives hours of intermittent visibility.
+	useEffect(() => {
+		if (!roomId || isLoading || !joinedRef.current) return
+		const t = setInterval(() => {
+			const mine = players.find((p) => p.userId === userId)
+			if (!mine || mine.lastSeenAt < Date.now() - PLAYER_ACTIVE_WINDOW_MS) {
+				ensureRoomAndJoin({
+					roomCode: roomId,
+					user,
+					roomExists: roomEid != null,
+					existingRoomId: roomEid ?? undefined,
+					existingPlayerId: mine?.id,
+				})
+			}
+		}, 15_000)
+		return () => clearInterval(t)
+	}, [roomId, isLoading, roomEid, players, user, userId])
+
+	// Hygiene: purge rows abandoned for over a day. Rooms are never deleted
+	// automatically, so a room link stays valid for the whole session.
+	useEffect(() => {
+		if (!roomId || isLoading) return
+		const t = setInterval(() => {
+			const stale = players.filter(
+				(p) =>
+					p.userId !== userId &&
+					p.lastSeenAt < Date.now() - STALE_PLAYER_TTL_MS
+			)
+			purgeAbandonedPlayers(stale.map((p) => p.id))
+		}, 5 * 60_000)
+		return () => clearInterval(t)
+	}, [roomId, isLoading, players, userId])
+
+	const countingDown =
+		!!roomData?.timerStartedAt &&
+		now < roomData.timerStartedAt &&
+		!roomData.revealed
+	const countdown = countingDown
+		? Math.ceil(((roomData!.timerStartedAt as number) - now) / 1000)
+		: null
+
+	// Everyone who joined stays on the table for the whole session; activity
+	// is only used to gate voting transitions (ghost-proof rendering).
+	const users: User[] = players.map((p) => ({
+		id: p.userId,
+		name: p.name,
+		role: p.role as User['role'],
+		vote: p.vote ?? null,
+		hasVoted: p.hasVoted,
+		roomName: p.roomName,
+		votingOptions: roomData?.votingOptions ?? FIBONACCI_SEQUENCE,
+	}))
+
+	const activeEstimators = players.filter(
+		(p) =>
+			p.role === 'estimator' && p.lastSeenAt > now - PLAYER_ACTIVE_WINDOW_MS
+	)
+	const allActiveEstimatorsVoted =
+		activeEstimators.length > 0 &&
+		activeEstimators.every((e) => e.hasVoted)
+
+	const votingOpen =
+		!!roomData &&
+		!!roomData.timerStartedAt &&
+		now >= roomData.timerStartedAt &&
+		!roomData.revealed &&
+		roomData.enabled
+
+	const timeLeft =
+		votingOpen && roomData?.timerStartedAt
+			? Math.max(
+					0,
+					roomData.timerDuration -
+						Math.floor((now - roomData.timerStartedAt) / 1000)
+				)
+			: null
+
+	const room: Room | null = roomData
+		? {
+				id: roomData.id,
+				name: roomData.name,
+				createdAt: new Date(roomData.createdAt),
+				users,
+				isVoting: votingOpen,
+				timerStartedAt:
+					votingOpen && roomData.timerStartedAt
+						? new Date(roomData.timerStartedAt)
+						: null,
+				timerDuration: roomData.timerDuration ?? DEFAULT_TIMER_DURATION,
+				revealed: roomData.revealed,
+				votingOptions: roomData.votingOptions ?? FIBONACCI_SEQUENCE,
+				enabled: roomData.enabled,
+			}
+		: null
+
+	const currentUser = users.find((u) => u.id === userId) ?? null
+
+	// Auto-reveal when every active estimator has voted (gone players can't block a round)
+	useEffect(() => {
+		if (!roomEid || !votingOpen) return
+		if (allActiveEstimatorsVoted) {
+			revealVotes(roomEid)
 		}
-	}
+	}, [roomEid, votingOpen, allActiveEstimatorsVoted])
 
-	const handleSetRoomTimer = (duration: number) => {
-		if (socket && room) {
-			socket.emit('setRoomTimer', room.id, duration)
+	// Auto-reveal when the timer expires (parity with the socket client behaviour)
+	useEffect(() => {
+		if (timeLeft === 0 && roomEid && room && !room.revealed) {
+			revealVotes(roomEid)
 		}
-	}
+	}, [timeLeft, roomEid, room])
 
-	if (error) {
+	if (error || dbError) {
 		return (
 			<div className='min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800'>
 				<div className='text-center text-red-600 dark:text-red-400'>
-					<h1 className='text-2xl font-bold'>{error}</h1>
+					<h1 className='text-2xl font-bold'>
+						{error || dbError?.message || 'Something went wrong'}
+					</h1>
 				</div>
 			</div>
 		)
@@ -207,15 +307,55 @@ export default function RoomPage() {
 			<div className='min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800'>
 				<div className='text-center'>
 					<h1 className='text-2xl font-bold text-gray-900 dark:text-white'>
-						Connecting to room...
+						{isLoading ? 'Connecting to room...' : 'Room not found'}
 					</h1>
 				</div>
 			</div>
 		)
 	}
 
+	const handleVote = (value: number) => {
+		if (myPlayer && room && votingOpen) {
+			submitVote(myPlayer.id, value)
+		}
+	}
+
+	const handleRevealVotes = () => {
+		if (roomEid) {
+			revealVotes(roomEid)
+		}
+	}
+
+	const handleResetVotes = () => {
+		if (roomEid) {
+			resetVotes(
+				roomEid,
+				players.map((p) => p.id)
+			)
+		}
+	}
+
+	const handleStartVoting = () => {
+		if (roomEid) {
+			startVoting(roomEid)
+		}
+	}
+
+	// Admin handlers for room enabling/disabling and timer settings
+	const handleToggleRoomEnabled = (enabled: boolean) => {
+		if (roomEid) {
+			toggleRoomEnabled(roomEid, enabled)
+		}
+	}
+
+	const handleSetRoomTimer = (duration: number) => {
+		if (roomEid) {
+			setRoomTimer(roomEid, duration)
+		}
+	}
+
 	const handleCopyInviteLink = () => {
-		const url = `${window.location.origin}/join/${params?.id}/?roomName=${
+		const url = `${window.location.origin}/join/?id=${roomId}&roomName=${
 			currentUser?.roomName ? encodeURIComponent(currentUser?.roomName) : 'room'
 		}`
 		navigator.clipboard.writeText(url)
@@ -247,7 +387,7 @@ export default function RoomPage() {
 	// Calculate progress percentage for the timer
 	const timerProgress =
 		timeLeft !== null ? (timeLeft / DEFAULT_TIMER_DURATION) * 100 : 0
-	// Vote state is managed through socket events
+	// Vote state is managed through realtime database updates
 	return (
 		<>
 			{countdown !== null && (
@@ -288,13 +428,9 @@ export default function RoomPage() {
 										</button>
 									)}
 									{room.isVoting && !room.revealed && room.enabled && (
-                                                                                <button
+                                                                        <button
                                                                                         onClick={handleRevealVotes}
-                                                                                        disabled={
-                                                                                                !room.users.every(
-                                                                                                        (user) => user.role !== 'estimator' || user.hasVoted
-                                                                                                )
-                                                                                        }
+                                                                                        disabled={!allActiveEstimatorsVoted}
                                                                                         className='px-md md:px-lg py-sm bg-brand-green hover:bg-brand-green-dark text-white rounded-md shadow-sm transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm md:text-base'
                                                                                 >
 											Reveal Votes
@@ -322,10 +458,10 @@ export default function RoomPage() {
                                                                         >
                                                                                 Admin Settings
                                                                         </button>
-                                                                </div>
-                                                        )}
-                                                </div>
-                                        </div>
+								</div>
+							)}
+						</div>
+					</div>
 
                                         <div className='flex-1 flex flex-col min-h-[500px] gap-lg md:gap-2xl overflow-y-auto justify-center'>
 						{/* Admin Controls Panel - Only visible to admin users */}
@@ -441,9 +577,9 @@ export default function RoomPage() {
 											} else if (angle >= 315 || angle < 45) {
 												position = 'right'
 											} else if (angle >= 45 && angle < 135) {
-												position = 'bottom'
-											} else {
 												position = 'left'
+											} else {
+												position = 'bottom'
 											}
 										}
 

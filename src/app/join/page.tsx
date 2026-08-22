@@ -1,27 +1,41 @@
 'use client'
 
-import { useState } from 'react'
-import { useParams, useRouter, useSearchParams } from 'next/navigation'
+import { Suspense, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { UserRole } from '@/types/room'
 
 export default function JoinRoom() {
-	const params = useParams()
+	return (
+		<Suspense
+			fallback={
+				<div className='min-h-screen bg-gradient-to-b from-white to-gray-100 dark:from-black dark:to-gray-800 font-brand' />
+			}
+		>
+			<JoinRoomContent />
+		</Suspense>
+	)
+}
+
+function JoinRoomContent() {
 	const searchParams = useSearchParams()
 	const router = useRouter()
 	const [userName, setUserName] = useState('')
 	const [role, setRole] = useState<UserRole>('estimator')
 	const [error, setError] = useState('')
+	const roomId = searchParams.get('id')
 	const roomName = searchParams.get('roomName')
 	const handleJoinRoom = () => {
 		if (!userName.trim()) {
 			setError('Please enter your name')
 			return
 		}
+		if (!roomId) {
+			setError('Room ID is missing from the link')
+			return
+		}
 
 		router.push(
-			`/room/${
-				Array.isArray(params.id) ? params.id[0] : params.id
-			}?name=${encodeURIComponent(userName)}&role=${role}&roomName=${roomName}`
+			`/room/?id=${roomId}&name=${encodeURIComponent(userName)}&role=${role}&roomName=${roomName}`
 		)
 	}
 

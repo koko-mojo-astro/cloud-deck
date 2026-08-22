@@ -1,0 +1,26 @@
+# Render Blueprint: Cloud Deck
+#
+# Pure static deployment — realtime runs on InstantDB (https://instantdb.com),
+# so no Node service is needed. Only this Static Site is created.
+#
+# Required env var (set in dashboard when applying):
+#   NEXT_PUBLIC_INSTANT_APP_ID - your InstantDB app id
+#
+services:
+  - type: web
+    name: cloud-deck-web
+    runtime: static
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./out
+    pullRequestPreviewsEnabled: true
+    envVars:
+      - key: NEXT_PUBLIC_INSTANT_APP_ID
+        sync: false
+    routes:
+      # Backwards compatibility for previously shared /room/:id and /join/:id links
+      - type: rewrite
+        source: /room/:id
+        destination: /room/?id=:id
+      - type: rewrite
+        source: /join/:id
+        destination: /join/?id=:id

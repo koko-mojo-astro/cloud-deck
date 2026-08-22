@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Export the app as static files (out/) for Render Static Site hosting
+  output: 'export',
+  trailingSlash: true,
   typescript: {
     ignoreBuildErrors: false
   },
@@ -12,6 +15,8 @@ const nextConfig: NextConfig = {
     return config;
   },
   images: {
+    // Image optimization API requires a server; use unoptimized images for static hosting
+    unoptimized: true,
     // limit of 25 deviceSizes values
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
     // limit of 25 imageSizes values
