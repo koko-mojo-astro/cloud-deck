@@ -13,12 +13,12 @@ import {
 	ensureRoomAndJoin,
 	heartbeat,
 	leaveRoom,
+	purgeAbandonedPlayers,
 	revealVotes,
 	resetVotes,
 	setRoomTimer,
 	startVoting,
 	submitVote,
-	sweepStalePlayers,
 	toggleRoomEnabled,
 	PLAYER_ACTIVE_WINDOW_MS,
 	STALE_PLAYER_TTL_MS,
@@ -131,14 +131,35 @@ function RoomContent() {
 		playerIdRef.current = myPlayer?.id ?? null
 	}, [myPlayer?.id])
 
-	// Presence heartbeat
+	// Presence heartbeat: interval while visible + instant beat on user activity.
+	// Background tabs throttle timers, so focus/visibility events guarantee a
+	// fresh heartbeat the moment the tab becomes relevant again.
 	useEffect(() => {
 		const pid = playerIdRef.current
 		if (!pid) return
-		const beat = () => heartbeat(pid, Date.now())
+		let lastBeat = 0
+		const beat = () => {
+			const t = Date.now()
+			if (t - lastBeat < 5_000) return
+			lastBeat = t
+			heartbeat(pid, t)
+		}
 		beat()
-		const t = setInterval(beat, 20_000)
-		return () => clearInterval(t)
+		const t = setInterval(beat, 30_000)
+		const wake = () => {
+			if (document.visibilityState === 'visible') beat()
+		}
+		document.addEventListener('visibilitychange', wake)
+		window.addEventListener('focus', wake)
+		window.addEventListener('pointerdown', wake)
+		window.addEventListener('keydown', wake)
+		return () => {
+			clearInterval(t)
+			document.removeEventListener('visibilitychange', wake)
+			window.removeEventListener('focus', wake)
+			window.removeEventListener('pointerdown', wake)
+			window.removeEventListener('keydown', wake)
+		}
 	}, [playerIdRef.current])
 
 	// Leave on unmount (navigation); best-effort on tab close
@@ -155,36 +176,40 @@ function RoomContent() {
 
 	// Activate voting once the countdown elapses
 
-	// Self-heal presence + sweep disconnected players
+	// Self-heal: re-assert our presence if our row vanished or went stale
+	// (e.g. after a long-throttled background tab). Runs frequently and is
+	// idempotent, so a session survives hours of intermittent visibility.
 	useEffect(() => {
 		if (!roomId || isLoading || !joinedRef.current) return
 		const t = setInterval(() => {
 			const mine = players.find((p) => p.userId === userId)
-			if (!mine) {
-				// Our row was swept (e.g. long backgrounded tab): re-assert presence
+			if (!mine || mine.lastSeenAt < Date.now() - PLAYER_ACTIVE_WINDOW_MS) {
 				ensureRoomAndJoin({
 					roomCode: roomId,
 					user,
 					roomExists: roomEid != null,
 					existingRoomId: roomEid ?? undefined,
+					existingPlayerId: mine?.id,
 				})
-				return
 			}
-			if (!roomData) return
+		}, 15_000)
+		return () => clearInterval(t)
+	}, [roomId, isLoading, roomEid, players, user, userId])
+
+	// Hygiene: purge rows abandoned for over a day. Rooms are never deleted
+	// automatically, so a room link stays valid for the whole session.
+	useEffect(() => {
+		if (!roomId || isLoading) return
+		const t = setInterval(() => {
 			const stale = players.filter(
 				(p) =>
 					p.userId !== userId &&
 					p.lastSeenAt < Date.now() - STALE_PLAYER_TTL_MS
 			)
-			const activeCount = players.length - stale.length
-			sweepStalePlayers(
-				stale.map((p) => p.id),
-				activeCount,
-				roomData.id
-			)
-		}, 30_000)
+			purgeAbandonedPlayers(stale.map((p) => p.id))
+		}, 5 * 60_000)
 		return () => clearInterval(t)
-	}, [roomId, isLoading, roomData, roomEid, players, user, userId])
+	}, [roomId, isLoading, players, userId])
 
 	const countingDown =
 		!!roomData?.timerStartedAt &&
@@ -194,12 +219,9 @@ function RoomContent() {
 		? Math.ceil(((roomData!.timerStartedAt as number) - now) / 1000)
 		: null
 
-	// Active players only (stale ones are swept separately)
-	const activePlayers = players.filter(
-		(p) => p.lastSeenAt > now - PLAYER_ACTIVE_WINDOW_MS
-	)
-
-	const users: User[] = activePlayers.map((p) => ({
+	// Everyone who joined stays on the table for the whole session; activity
+	// is only used to gate voting transitions (ghost-proof rendering).
+	const users: User[] = players.map((p) => ({
 		id: p.userId,
 		name: p.name,
 		role: p.role as User['role'],
@@ -208,6 +230,14 @@ function RoomContent() {
 		roomName: p.roomName,
 		votingOptions: roomData?.votingOptions ?? FIBONACCI_SEQUENCE,
 	}))
+
+	const activeEstimators = players.filter(
+		(p) =>
+			p.role === 'estimator' && p.lastSeenAt > now - PLAYER_ACTIVE_WINDOW_MS
+	)
+	const allActiveEstimatorsVoted =
+		activeEstimators.length > 0 &&
+		activeEstimators.every((e) => e.hasVoted)
 
 	const votingOpen =
 		!!roomData &&
@@ -245,14 +275,13 @@ function RoomContent() {
 
 	const currentUser = users.find((u) => u.id === userId) ?? null
 
-	// Auto-reveal when every estimator has voted (parity with the socket server)
+	// Auto-reveal when every active estimator has voted (gone players can't block a round)
 	useEffect(() => {
-		if (!roomEid || !votingOpen || !users.length) return
-		const estimators = users.filter((u) => u.role === 'estimator')
-		if (estimators.length > 0 && estimators.every((e) => e.hasVoted)) {
+		if (!roomEid || !votingOpen) return
+		if (allActiveEstimatorsVoted) {
 			revealVotes(roomEid)
 		}
-	}, [roomEid, votingOpen, users])
+	}, [roomEid, votingOpen, allActiveEstimatorsVoted])
 
 	// Auto-reveal when the timer expires (parity with the socket client behaviour)
 	useEffect(() => {
@@ -399,13 +428,9 @@ function RoomContent() {
 										</button>
 									)}
 									{room.isVoting && !room.revealed && room.enabled && (
-                                                                                <button
+                                                                        <button
                                                                                         onClick={handleRevealVotes}
-                                                                                        disabled={
-                                                                                                !room.users.every(
-                                                                                                        (user) => user.role !== 'estimator' || user.hasVoted
-                                                                                                )
-                                                                                        }
+                                                                                        disabled={!allActiveEstimatorsVoted}
                                                                                         className='px-md md:px-lg py-sm bg-brand-green hover:bg-brand-green-dark text-white rounded-md shadow-sm transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm md:text-base'
                                                                                 >
 											Reveal Votes
