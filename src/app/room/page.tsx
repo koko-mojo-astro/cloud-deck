@@ -1,14 +1,28 @@
 'use client'
 
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { io, Socket } from 'socket.io-client'
 import {
 	User,
 	Room,
 	FIBONACCI_SEQUENCE,
 	DEFAULT_TIMER_DURATION,
 } from '@/types/room'
+import { db } from '@/lib/db'
+import {
+	ensureRoomAndJoin,
+	heartbeat,
+	leaveRoom,
+	revealVotes,
+	resetVotes,
+	setRoomTimer,
+	startVoting,
+	submitVote,
+	sweepStalePlayers,
+	toggleRoomEnabled,
+	PLAYER_ACTIVE_WINDOW_MS,
+	STALE_PLAYER_TTL_MS,
+} from '@/lib/room-actions'
 import VotingControls from './components/VotingControls'
 import PlayerCard from './components/PlayerCard'
 import VotingResults from './components/VotingResults'
@@ -32,22 +46,62 @@ export default function RoomPage() {
 	)
 }
 
+const COUNTDOWN_MS = 3_000
+
 function RoomContent() {
 	const [showAdminControls, setShowAdminControls] = useState(false)
 	const searchParams = useSearchParams()
 	const roomId = searchParams?.get('id')
-	const [socket, setSocket] = useState<Socket | null>(null)
-	const [room, setRoom] = useState<Room | null>(null)
-	const [error, setError] = useState<string | null>(null)
-	const [inviteUrl, setInviteUrl] = useState('')
-	const [inviteToast, setInviteToast] = useState('')
-	const [currentUser, setCurrentUser] = useState<User | null>(null)
-	const [timeLeft, setTimeLeft] = useState<number | null>(null)
-	const [countdown, setCountdown] = useState<number | null>(null)
-	const [currentPage, setCurrentPage] = useState(0)
+	const name = searchParams?.get('name') || ''
+	const role = (searchParams?.get('role') || 'estimator') as
+		| 'estimator'
+		| 'observer'
+		| 'admin'
+	const roomName = searchParams?.get('roomName') || 'Planning Poker Room'
 
+	// Stable per-tab identity, mirroring the previous socket-session behaviour
+	const [userId] = useState(() => Math.random().toString(36).substring(2, 9))
+
+	const [error, setError] = useState<string | null>(null)
+	const [inviteToast, setInviteToast] = useState('')
+	const [currentPage, setCurrentPage] = useState(0)
+	const [now, setNow] = useState(() => Date.now())
+	const joinedRef = useRef(false)
+
+	// Realtime subscription: this single query replaces the socket connection
+	const { isLoading, error: dbError, data } = db.useQuery(
+		roomId
+			? {
+					rooms: { $: { where: { id: roomId } } },
+					players: { $: { where: { roomId } } },
+				}
+			: null
+	)
+
+	const roomData = data?.rooms?.[0]
+	const players = data?.players ?? []
+
+	const user: User = useMemo(
+		() => ({
+			id: userId,
+			name,
+			vote: null,
+			hasVoted: false,
+			role,
+			roomName,
+			votingOptions: FIBONACCI_SEQUENCE,
+		}),
+		[userId, name, role, roomName]
+	)
+
+	// Ticking clock drives countdown, timer and presence windows
 	useEffect(() => {
-		const name = searchParams?.get('name')
+		const t = setInterval(() => setNow(Date.now()), 1000)
+		return () => clearInterval(t)
+	}, [])
+
+	// Join once the initial query resolves
+	useEffect(() => {
 		if (!roomId) {
 			setError('Room ID is required')
 			return
@@ -56,167 +110,127 @@ function RoomContent() {
 			setError('Name is required')
 			return
 		}
-                const socket_url =
-                        process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3000'
-                const newSocket = io(socket_url, {
-                        path: '/socket.io',
-                        transports: ['websocket', 'polling'],
-                        reconnectionAttempts: 5,
-                        reconnectionDelay: 1000,
-                        timeout: 10000,
-			autoConnect: true,
-			forceNew: true,
-		})
-		setSocket(newSocket)
-
-		const role = searchParams?.get('role') || 'estimator'
-		const roomName = searchParams?.get('roomName') || 'Planning Poker Room'
-		const user: User = {
-			id: Math.random().toString(36).substring(2, 9),
-			name,
-			vote: null,
-			hasVoted: false,
-			role: role as 'estimator' | 'observer' | 'admin',
-			roomName,
-			votingOptions: FIBONACCI_SEQUENCE,
+		setError(null)
+		if (!joinedRef.current && !isLoading) {
+			joinedRef.current = true
+			ensureRoomAndJoin(roomId, user, (data?.rooms?.length ?? 0) > 0)
 		}
-		setCurrentUser(user)
+	}, [roomId, name, isLoading, user, data])
 
-		newSocket.on('connect', () => {
-			newSocket.emit('joinRoom', roomId, user)
-		})
+	// Presence heartbeat
+	useEffect(() => {
+		if (!roomId || !joinedRef.current) return
+		const beat = () => heartbeat(roomId, userId, Date.now())
+		const t = setInterval(beat, 20_000)
+		return () => clearInterval(t)
+	}, [roomId, userId])
 
-		newSocket.on('countdownStarted', () => {
-			setCountdown(3)
-			const countdownInterval = setInterval(() => {
-				setCountdown((prev) => {
-					if (prev === null || prev <= 1) {
-						clearInterval(countdownInterval)
-						return null
-					}
-					return prev - 1
-				})
-			}, 1000)
-
-			// Clear countdown after 3 seconds
-			setTimeout(() => {
-				clearInterval(countdownInterval)
-				setCountdown(null)
-			}, 3000)
-		})
-
-		newSocket.on('roomUpdated', (updatedRoom: Room) => {
-			// Update current user's vote from the room state
-			const updatedCurrentUser = updatedRoom.users.find((u) => u.id === user.id)
-			if (updatedCurrentUser) {
-				setCurrentUser(updatedCurrentUser)
-			}
-			// Reset current user's vote if voting options have changed
-			if (
-				room &&
-				JSON.stringify(room.votingOptions) !==
-					JSON.stringify(updatedRoom.votingOptions)
-			) {
-				newSocket.emit('submitVote', updatedRoom.id, user.id, null)
-			}
-
-			setRoom(updatedRoom)
-			const url = `${window.location.origin}/join/?id=${roomId}`
-			setInviteUrl(url)
-
-			// Handle timer updates
-			if (updatedRoom.revealed) {
-				setTimeLeft(null) // Reset timer when votes are revealed
-			} else if (updatedRoom.isVoting && updatedRoom.timerStartedAt) {
-				const startTime = new Date(updatedRoom.timerStartedAt).getTime()
-				const now = new Date().getTime()
-				const elapsed = Math.floor((now - startTime) / 1000)
-				const remaining = Math.max(0, updatedRoom.timerDuration - elapsed)
-				setTimeLeft(remaining)
-			} else {
-				setTimeLeft(null)
-			}
-		})
-
-		newSocket.on('connect_error', () => {
-			setError('Failed to connect to server')
-		})
-
+	// Leave on unmount (navigation); best-effort on tab close
+	useEffect(() => {
+		if (!roomId) return
+		const onBeforeUnload = () => leaveRoom(roomId, userId)
+		window.addEventListener('beforeunload', onBeforeUnload)
 		return () => {
-			if (newSocket) {
-				newSocket.emit('leaveRoom', roomId, user.id)
-				newSocket.disconnect()
+			window.removeEventListener('beforeunload', onBeforeUnload)
+			leaveRoom(roomId, userId)
+		}
+	}, [roomId, userId])
+
+	// Sweep disconnected players; delete room when the last one leaves
+	useEffect(() => {
+		if (!roomId || isLoading || !roomData) return
+		const t = setInterval(() => {
+			const stale = players.filter((p) => p.lastSeenAt < Date.now() - STALE_PLAYER_TTL_MS)
+			const activeCount = players.length - stale.length
+			sweepStalePlayers(stale.map((p) => p.id), activeCount, roomId)
+		}, 30_000)
+		return () => clearInterval(t)
+	}, [roomId, isLoading, roomData, players])
+
+	// Activate voting once the countdown elapses
+
+	const countingDown =
+		!!roomData?.timerStartedAt &&
+		now < roomData.timerStartedAt &&
+		!roomData.revealed
+	const countdown = countingDown
+		? Math.ceil(((roomData!.timerStartedAt as number) - now) / 1000)
+		: null
+
+	// Active players only (stale ones are swept separately)
+	const activePlayers = players.filter(
+		(p) => p.lastSeenAt > now - PLAYER_ACTIVE_WINDOW_MS
+	)
+
+	const users: User[] = activePlayers.map((p) => ({
+		id: p.userId,
+		name: p.name,
+		role: p.role as User['role'],
+		vote: p.vote ?? null,
+		hasVoted: p.hasVoted,
+		roomName: p.roomName,
+		votingOptions: roomData?.votingOptions ?? FIBONACCI_SEQUENCE,
+	}))
+
+	const votingOpen =
+		!!roomData &&
+		!!roomData.timerStartedAt &&
+		now >= roomData.timerStartedAt &&
+		!roomData.revealed &&
+		roomData.enabled
+
+	const timeLeft =
+		votingOpen && roomData?.timerStartedAt
+			? Math.max(
+					0,
+					roomData.timerDuration -
+						Math.floor((now - roomData.timerStartedAt) / 1000)
+				)
+			: null
+
+	const room: Room | null = roomData
+		? {
+				id: roomData.id,
+				name: roomData.name,
+				createdAt: new Date(roomData.createdAt),
+				users,
+				isVoting: votingOpen,
+				timerStartedAt:
+					votingOpen && roomData.timerStartedAt
+						? new Date(roomData.timerStartedAt)
+						: null,
+				timerDuration: roomData.timerDuration ?? DEFAULT_TIMER_DURATION,
+				revealed: roomData.revealed,
+				votingOptions: roomData.votingOptions ?? FIBONACCI_SEQUENCE,
+				enabled: roomData.enabled,
 			}
-		}
-	}, [roomId, searchParams])
+		: null
 
-	// Timer countdown effect
+	const currentUser = users.find((u) => u.id === userId) ?? null
+
+	// Auto-reveal when every estimator has voted (parity with the socket server)
 	useEffect(() => {
-		if (timeLeft === null || timeLeft === 0 || room?.revealed) return
+		if (!roomId || !votingOpen || !users.length) return
+		const estimators = users.filter((u) => u.role === 'estimator')
+		if (estimators.length > 0 && estimators.every((e) => e.hasVoted)) {
+			revealVotes(roomId)
+		}
+	}, [roomId, votingOpen, users])
 
-		const timer = setInterval(() => {
-			setTimeLeft((prev) => {
-				if (prev === null || prev <= 0 || room?.revealed) {
-					clearInterval(timer)
-					return 0
-				}
-				return prev - 1
-			})
-		}, 1000)
-
-		return () => clearInterval(timer)
-	}, [timeLeft, room?.revealed])
-
-	// Auto-reveal votes when timer reaches 0
+	// Auto-reveal when the timer expires (parity with the socket client behaviour)
 	useEffect(() => {
-		if (timeLeft === 0 && socket && room && !room.revealed) {
-			socket.emit('revealVotes', room.id)
-			setTimeLeft(null) // Reset timer when votes are revealed
+		if (timeLeft === 0 && roomId && room && !room.revealed) {
+			revealVotes(roomId)
 		}
-	}, [timeLeft, socket, room])
+	}, [timeLeft, roomId, room])
 
-	const handleVote = (value: number) => {
-		if (socket && currentUser && room && !room.revealed) {
-			socket.emit('submitVote', room.id, currentUser.id, value)
-		}
-	}
-
-	const handleRevealVotes = () => {
-		if (socket && room) {
-			socket.emit('revealVotes', room.id)
-		}
-	}
-
-	const handleResetVotes = () => {
-		if (socket && room) {
-			socket.emit('resetVotes', room.id)
-		}
-	}
-
-	const handleStartVoting = () => {
-		if (socket && room) {
-			socket.emit('startVoting', room.id)
-		}
-	}
-
-	// Admin handlers for room enabling/disabling and timer settings
-	const handleToggleRoomEnabled = (enabled: boolean) => {
-		if (socket && room) {
-			socket.emit('toggleRoomEnabled', room.id, enabled)
-		}
-	}
-
-	const handleSetRoomTimer = (duration: number) => {
-		if (socket && room) {
-			socket.emit('setRoomTimer', room.id, duration)
-		}
-	}
-
-	if (error) {
+	if (error || dbError) {
 		return (
 			<div className='min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800'>
 				<div className='text-center text-red-600 dark:text-red-400'>
-					<h1 className='text-2xl font-bold'>{error}</h1>
+					<h1 className='text-2xl font-bold'>
+						{error || dbError?.message || 'Something went wrong'}
+					</h1>
 				</div>
 			</div>
 		)
@@ -227,11 +241,48 @@ function RoomContent() {
 			<div className='min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800'>
 				<div className='text-center'>
 					<h1 className='text-2xl font-bold text-gray-900 dark:text-white'>
-						Connecting to room...
+						{isLoading ? 'Connecting to room...' : 'Room not found'}
 					</h1>
 				</div>
 			</div>
 		)
+	}
+
+	const handleVote = (value: number) => {
+		if (roomId && currentUser && room && !room.revealed) {
+			submitVote(roomId, currentUser.id, value)
+		}
+	}
+
+	const handleRevealVotes = () => {
+		if (roomId) {
+			revealVotes(roomId)
+		}
+	}
+
+	const handleResetVotes = () => {
+		if (roomId) {
+			resetVotes(roomId, players.map((p) => ({ id: p.id })))
+		}
+	}
+
+	const handleStartVoting = () => {
+		if (roomId) {
+			startVoting(roomId)
+		}
+	}
+
+	// Admin handlers for room enabling/disabling and timer settings
+	const handleToggleRoomEnabled = (enabled: boolean) => {
+		if (roomId) {
+			toggleRoomEnabled(roomId, enabled)
+		}
+	}
+
+	const handleSetRoomTimer = (duration: number) => {
+		if (roomId) {
+			setRoomTimer(roomId, duration)
+		}
 	}
 
 	const handleCopyInviteLink = () => {
@@ -267,7 +318,7 @@ function RoomContent() {
 	// Calculate progress percentage for the timer
 	const timerProgress =
 		timeLeft !== null ? (timeLeft / DEFAULT_TIMER_DURATION) * 100 : 0
-	// Vote state is managed through socket events
+	// Vote state is managed through realtime database updates
 	return (
 		<>
 			{countdown !== null && (
@@ -342,10 +393,10 @@ function RoomContent() {
                                                                         >
                                                                                 Admin Settings
                                                                         </button>
-                                                                </div>
-                                                        )}
-                                                </div>
-                                        </div>
+								</div>
+							)}
+						</div>
+					</div>
 
                                         <div className='flex-1 flex flex-col min-h-[500px] gap-lg md:gap-2xl overflow-y-auto justify-center'>
 						{/* Admin Controls Panel - Only visible to admin users */}
@@ -461,9 +512,9 @@ function RoomContent() {
 											} else if (angle >= 315 || angle < 45) {
 												position = 'right'
 											} else if (angle >= 45 && angle < 135) {
-												position = 'bottom'
-											} else {
 												position = 'left'
+											} else {
+												position = 'bottom'
 											}
 										}
 

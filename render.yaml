@@ -1,16 +1,12 @@
 # Render Blueprint: Cloud Deck
 #
-# Deploys the app as two services so it can run on Render Static hosting:
-#   1. cloud-deck-web   (static)   - Next.js static export served from ./out
-#   2. cloud-deck-socket (node)    - Socket.IO realtime server
+# Pure static deployment — realtime runs on InstantDB (https://instantdb.com),
+# so no Node service is needed. Only this Static Site is created.
 #
-# After the first deploy:
-#   - Set NEXT_PUBLIC_SOCKET_URL on cloud-deck-web to cloud-deck-socket's URL (e.g. https://cloud-deck-socket.onrender.com)
-#   - Set CORS_ORIGIN on cloud-deck-socket to the static site's URL (e.g. https://cloud-deck-web.onrender.com)
-#   - Trigger a manual deploy of cloud-deck-web once (NEXT_PUBLIC_* vars are baked in at build time)
-
+# Required env var (set in dashboard when applying):
+#   NEXT_PUBLIC_INSTANT_APP_ID - your InstantDB app id
+#
 services:
-  # Static frontend (Next.js static export)
   - type: web
     name: cloud-deck-web
     runtime: static
@@ -18,7 +14,7 @@ services:
     staticPublishPath: ./out
     pullRequestPreviewsEnabled: true
     envVars:
-      - key: NEXT_PUBLIC_SOCKET_URL
+      - key: NEXT_PUBLIC_INSTANT_APP_ID
         sync: false
     routes:
       # Backwards compatibility for previously shared /room/:id and /join/:id links
@@ -28,16 +24,3 @@ services:
       - type: rewrite
         source: /join/:id
         destination: /join/?id=:id
-
-  # Socket.IO realtime backend
-  - type: web
-    name: cloud-deck-socket
-    runtime: node
-    buildCommand: npm ci
-    startCommand: npm run start
-    healthCheckPath: /
-    envVars:
-      - key: NODE_ENV
-        value: production
-      - key: CORS_ORIGIN
-        sync: false
