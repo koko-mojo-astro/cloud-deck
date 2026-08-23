@@ -11,6 +11,7 @@ const _schema = i.schema({
 			timerStartedAt: i.number().optional(),
 			revealed: i.boolean(),
 			enabled: i.boolean(),
+			disbandedAt: i.number().optional(),
 		}),
 		players: i.entity({
 			roomId: i.string().indexed(),
